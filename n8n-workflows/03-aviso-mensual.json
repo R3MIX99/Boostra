@@ -1,0 +1,94 @@
+{
+  "name": "03 — Aviso Mensual Automático",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 9 1 * *" }]
+        }
+      },
+      "name": "Schedule — Día 1 del mes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "operation": "search",
+        "baseId": "appnenFMauShRa5hl",
+        "tableId": "tblRswQ1c6hho0efT",
+        "filterByFormula": "{Estado}=\"Activo\"",
+        "returnAll": true
+      },
+      "name": "Airtable — Obtener Clientes Activos",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [460, 300],
+      "credentials": { "airtableTokenApi": { "name": "Airtable Token" } }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [{ "value1": "={{ $items().length }}", "operation": "larger", "value2": 0 }]
+        }
+      },
+      "name": "IF — Hay clientes?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "batchSize": 10,
+        "options": {}
+      },
+      "name": "Split — Lotes de 10",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 2,
+      "position": [900, 200]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.fields.Email }}",
+        "subject": "=Hola {{ $json.fields.Nombre }}, ¿en qué podemos ayudarte este mes?",
+        "emailType": "html",
+        "message": "=<div style=\"font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:32px;background:#f9f9f9\">\n  <div style=\"background:#5B6AF0;color:#fff;padding:24px 32px;border-radius:12px 12px 0 0\">\n    <h1 style=\"margin:0;font-size:22px\">¡Hola {{ $json.fields.Nombre }}! 👋</h1>\n  </div>\n  <div style=\"background:#fff;padding:32px;border-radius:0 0 12px 12px;border:1px solid #e0e0e0\">\n    <p style=\"color:#444;font-size:16px\">Esperamos que todo vaya muy bien con tu proyecto.</p>\n    <p style=\"color:#444\">Nos ponemos en contacto para saber cómo te va y si hay algo en lo que podamos ayudarte este mes. Tu éxito es nuestra prioridad.</p>\n    <p style=\"color:#444\">Si tienes alguna necesidad, idea nueva o proyecto en mente, estamos aquí para apoyarte. ¡Solo escríbenos!</p>\n    <p style=\"color:#888;font-size:13px;margin-top:32px\">Con gusto,<br>Tu equipo de trabajo</p>\n  </div>\n</div>",
+        "options": {}
+      },
+      "name": "Gmail — Aviso Mensual",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [1120, 200],
+      "credentials": { "gmailOAuth2": { "name": "Gmail Account" } }
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "baseId": "appnenFMauShRa5hl",
+        "tableId": "tblW1ndG08XySoYed",
+        "fieldsUi": {
+          "fieldValues": [
+            { "fieldId": "fldQb32FZEuXCgtFW", "fieldValue": "=Aviso mensual enviado a {{ $('Airtable — Obtener Clientes Activos').all().length }} clientes" },
+            { "fieldId": "fldH5pyUQ0JwM1Ezv", "fieldValue": "={{ new Date().toISOString() }}" },
+            { "fieldId": "fldUV5hc3PSeZhAyB", "fieldValue": "aviso_mensual" },
+            { "fieldId": "fldATicPxX4S5Zrrs", "fieldValue": "enviado" },
+            { "fieldId": "fldmrtslRazqrNhjA", "fieldValue": "={{ $('Airtable — Obtener Clientes Activos').all().length }}" }
+          ]
+        }
+      },
+      "name": "Airtable — Log Aviso",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [1340, 200],
+      "credentials": { "airtableTokenApi": { "name": "Airtable Token" } }
+    }
+  ],
+  "connections": {
+    "Schedule — Día 1 del mes": { "main": [[{ "node": "Airtable — Obtener Clientes Activos", "type": "main", "index": 0 }]] },
+    "Airtable — Obtener Clientes Activos": { "main": [[{ "node": "IF — Hay clientes?", "type": "main", "index": 0 }]] },
+    "IF — Hay clientes?": { "main": [[{ "node": "Split — Lotes de 10", "type": "main", "index": 0 }]] },
+    "Split — Lotes de 10": { "main": [[{ "node": "Gmail — Aviso Mensual", "type": "main", "index": 0 }]] },
+    "Gmail — Aviso Mensual": { "main": [[{ "node": "Airtable — Log Aviso", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}

@@ -1,0 +1,70 @@
+{
+  "name": "02 — Recordatorio de Pago (Email + WhatsApp)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "recordatorio-pago",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.body.clienteEmail }}",
+        "subject": "=Recordatorio: Factura {{ $json.body.numeroInv }} pendiente de pago",
+        "emailType": "html",
+        "message": "=<div style=\"font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:32px;background:#f9f9f9\">\n  <div style=\"background:#F5A623;color:#fff;padding:24px 32px;border-radius:12px 12px 0 0\">\n    <h1 style=\"margin:0;font-size:22px\">Recordatorio de pago 💳</h1>\n  </div>\n  <div style=\"background:#fff;padding:32px;border-radius:0 0 12px 12px;border:1px solid #e0e0e0\">\n    <p style=\"color:#444;font-size:16px\">Hola <strong>{{ $json.body.clienteNombre }}</strong>,</p>\n    <p style=\"color:#444\">Te recordamos amablemente que tienes un pago pendiente:</p>\n    <div style=\"background:#FEF5E7;border:1px solid #F5A623;border-radius:8px;padding:20px;margin:24px 0\">\n      <div style=\"margin-bottom:8px\"><span style=\"color:#666\">Factura:</span> <strong>{{ $json.body.numeroInv }}</strong></div>\n      <div style=\"margin-bottom:8px\"><span style=\"color:#666\">Monto pendiente:</span> <strong style=\"color:#E8920A;font-size:20px\">{{ Number($json.body.montoRestante).toLocaleString('es-MX',{style:'currency',currency:'MXN'}) }}</strong></div>\n      <div><span style=\"color:#666\">Fecha de vencimiento:</span> <strong>{{ $json.body.fechaVencimiento }}</strong></div>\n    </div>\n    <p style=\"color:#444\">Si ya realizaste el pago, por favor ignora este mensaje. Si tienes alguna pregunta o necesitas más tiempo, no dudes en contactarnos.</p>\n    <p style=\"color:#888;font-size:13px;margin-top:32px\">Gracias por tu preferencia.</p>\n  </div>\n</div>",
+        "options": {}
+      },
+      "name": "Gmail — Recordatorio",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [480, 200],
+      "credentials": { "gmailOAuth2": { "name": "Gmail Account" } }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "baseId": "appnenFMauShRa5hl",
+        "tableId": "tblf4fNX8M6Z2VUGY",
+        "id": "={{ $('Webhook').item.json.body.invoiceId }}",
+        "fieldsUi": {
+          "fieldValues": [
+            { "fieldId": "fldea7FOx3xL5Aer4", "fieldValue": "={{ new Date().toISOString().split('T')[0] }}" }
+          ]
+        }
+      },
+      "name": "Airtable — Actualizar UltimoRecordatorio",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [480, 400],
+      "credentials": { "airtableTokenApi": { "name": "Airtable Token" } }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"ok\": true, \"message\": \"Recordatorio enviado\" }"
+      },
+      "name": "Respuesta OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [720, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[
+        { "node": "Gmail — Recordatorio", "type": "main", "index": 0 },
+        { "node": "Airtable — Actualizar UltimoRecordatorio", "type": "main", "index": 0 }
+      ]]
+    },
+    "Gmail — Recordatorio": { "main": [[{ "node": "Respuesta OK", "type": "main", "index": 0 }]] },
+    "Airtable — Actualizar UltimoRecordatorio": { "main": [[{ "node": "Respuesta OK", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}

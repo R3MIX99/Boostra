@@ -1,0 +1,70 @@
+{
+  "name": "04 — Seguimiento de Cotización sin Respuesta",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "seguimiento-cotizacion",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.body.clienteEmail }}",
+        "subject": "=Seguimiento: Cotización {{ $json.body.numeroCot }}",
+        "emailType": "html",
+        "message": "=<div style=\"font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:32px;background:#f9f9f9\">\n  <div style=\"background:#38B2E8;color:#fff;padding:24px 32px;border-radius:12px 12px 0 0\">\n    <h1 style=\"margin:0;font-size:22px\">¿Todo bien con tu cotización? 🤝</h1>\n  </div>\n  <div style=\"background:#fff;padding:32px;border-radius:0 0 12px 12px;border:1px solid #e0e0e0\">\n    <p style=\"color:#444;font-size:16px\">Hola <strong>{{ $json.body.clienteNombre }}</strong>,</p>\n    <p style=\"color:#444\">Hace {{ $json.body.diasEspera }} días te enviamos la cotización <strong>{{ $json.body.numeroCot }}</strong> y quería asegurarme de que la hayas recibido correctamente.</p>\n    <p style=\"color:#444\">¿Tienes alguna duda sobre los servicios incluidos o el precio? Estaré encantado de aclarar cualquier punto o hacer ajustes si es necesario.</p>\n    <p style=\"color:#444\">No hay presión, solo quiero asegurarme de que tengas toda la información que necesitas para tomar tu decisión.</p>\n    <p style=\"color:#888;font-size:13px;margin-top:32px\">Quedo a tus órdenes,</p>\n  </div>\n</div>",
+        "options": {}
+      },
+      "name": "Gmail — Seguimiento",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [480, 200],
+      "credentials": { "gmailOAuth2": { "name": "Gmail Account" } }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "baseId": "appnenFMauShRa5hl",
+        "tableId": "tblxjHrNcrYj28JN4",
+        "id": "={{ $('Webhook').item.json.body.cotizacionId }}",
+        "fieldsUi": {
+          "fieldValues": [
+            { "fieldId": "fldSA2vWcceCScwtI", "fieldValue": "={{ new Date().toISOString().split('T')[0] }}" }
+          ]
+        }
+      },
+      "name": "Airtable — Actualizar UltimoSeguimiento",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [480, 400],
+      "credentials": { "airtableTokenApi": { "name": "Airtable Token" } }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"ok\": true, \"message\": \"Seguimiento enviado\" }"
+      },
+      "name": "Respuesta OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [720, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[
+        { "node": "Gmail — Seguimiento", "type": "main", "index": 0 },
+        { "node": "Airtable — Actualizar UltimoSeguimiento", "type": "main", "index": 0 }
+      ]]
+    },
+    "Gmail — Seguimiento": { "main": [[{ "node": "Respuesta OK", "type": "main", "index": 0 }]] },
+    "Airtable — Actualizar UltimoSeguimiento": { "main": [[{ "node": "Respuesta OK", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}

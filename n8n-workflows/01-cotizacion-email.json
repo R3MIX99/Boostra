@@ -1,0 +1,71 @@
+{
+  "name": "01 — Enviar Cotización por Email",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "cotizacion-email",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "baseId": "appnenFMauShRa5hl",
+        "tableId": "tblxjHrNcrYj28JN4",
+        "id": "={{ $json.body.cotizacionId }}",
+        "fieldsUi": {
+          "fieldValues": [
+            { "fieldId": "fldfdwaAqdPdVDYGM", "fieldValue": "Enviada" },
+            { "fieldId": "fldnJiS6pMcuV0Br9", "fieldValue": "={{ new Date().toISOString().split('T')[0] }}" }
+          ]
+        }
+      },
+      "name": "Airtable — Marcar Enviada",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [480, 200],
+      "credentials": { "airtableTokenApi": { "name": "Airtable Token" } }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Webhook').item.json.body.clienteEmail }}",
+        "subject": "=Tu cotización {{ $('Webhook').item.json.body.numeroCot }} está lista",
+        "emailType": "html",
+        "message": "=<div style=\"font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:32px;background:#f9f9f9\">\n  <div style=\"background:#5B6AF0;color:#fff;padding:24px 32px;border-radius:12px 12px 0 0\">\n    <h1 style=\"margin:0;font-size:24px\">Tu cotización está lista ✅</h1>\n  </div>\n  <div style=\"background:#fff;padding:32px;border-radius:0 0 12px 12px;border:1px solid #e0e0e0\">\n    <p style=\"color:#444;font-size:16px\">Hola <strong>{{ $('Webhook').item.json.body.clienteNombre }}</strong>,</p>\n    <p style=\"color:#444\">Hemos preparado una cotización para ti con los siguientes detalles:</p>\n    <div style=\"background:#f4f4f8;border-radius:8px;padding:20px;margin:24px 0\">\n      <div style=\"display:flex;justify-content:space-between;margin-bottom:8px\">\n        <span style=\"color:#666\">Número de cotización:</span>\n        <strong>{{ $('Webhook').item.json.body.numeroCot }}</strong>\n      </div>\n      <div style=\"display:flex;justify-content:space-between\">\n        <span style=\"color:#666\">Total:</span>\n        <strong style=\"font-size:20px;color:#5B6AF0\">{{ Number($('Webhook').item.json.body.total).toLocaleString('es-MX',{style:'currency',currency:'MXN'}) }}</strong>\n      </div>\n    </div>\n    <p style=\"color:#444\">Para revisar los detalles y aprobar la cotización, contáctanos respondiendo a este correo.</p>\n    <p style=\"color:#888;font-size:13px;margin-top:32px\">Si tienes preguntas, estamos aquí para ayudarte.</p>\n  </div>\n</div>",
+        "options": {}
+      },
+      "name": "Gmail — Enviar Cotización",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [480, 400],
+      "credentials": { "gmailOAuth2": { "name": "Gmail Account" } }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"ok\": true, \"message\": \"Cotización enviada por email\" }"
+      },
+      "name": "Respuesta OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [720, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[
+        { "node": "Airtable — Marcar Enviada", "type": "main", "index": 0 },
+        { "node": "Gmail — Enviar Cotización", "type": "main", "index": 0 }
+      ]]
+    },
+    "Airtable — Marcar Enviada": { "main": [[{ "node": "Respuesta OK", "type": "main", "index": 0 }]] },
+    "Gmail — Enviar Cotización": { "main": [[{ "node": "Respuesta OK", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}
