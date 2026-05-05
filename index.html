@@ -514,7 +514,11 @@
             </div>
           </div>
         </div>
-        <button class="btn btn-primary" onclick="saveConfig()">💾 Guardar configuración</button>
+        <div style="display:flex;gap:var(--space-3);flex-wrap:wrap;margin-top:var(--space-4)">
+          <button class="btn btn-primary" onclick="saveConfig()">💾 Guardar configuración</button>
+          <button class="btn btn-secondary" onclick="testConnection()">🔌 Probar conexión</button>
+        </div>
+        <div id="test-result" style="margin-top:var(--space-4)"></div>
       </div>
     </div>
   </div>
@@ -581,6 +585,37 @@ function saveConfig() {
   toast('Configuración guardada', 'success');
   document.getElementById('sidebar-name').textContent = cfg.name || 'App Emprendedor';
   document.getElementById('logo-initial').textContent = (cfg.name || 'A')[0].toUpperCase();
+}
+
+async function testConnection() {
+  const token = document.getElementById('cfg-token').value.trim() || AppConfig.AIRTABLE_TOKEN;
+  const base  = document.getElementById('cfg-base').value.trim()  || AppConfig.BASE_ID;
+  const el = document.getElementById('test-result');
+  if (!token) { el.innerHTML = `<span style="color:var(--warning-text)">⚠️ Ingresa el token primero</span>`; return; }
+  if (!base)  { el.innerHTML = `<span style="color:var(--warning-text)">⚠️ Ingresa el Base ID primero</span>`; return; }
+  el.innerHTML = `<span style="color:var(--text-muted)"><span class="spinner" style="display:inline-block;margin-right:8px"></span>Probando...</span>`;
+  try {
+    const res = await fetch(`https://api.airtable.com/v0/${base}/Clientes?maxRecords=1`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const data = await res.json();
+    if (res.ok) {
+      el.innerHTML = `<div style="color:var(--success-text);background:var(--success-subtle);border:1px solid var(--success);padding:var(--space-3) var(--space-4);border-radius:var(--radius-md)">
+        ✅ <strong>Conexión exitosa.</strong> Se encontraron registros en la tabla Clientes.<br>
+        <span style="font-size:var(--text-xs);font-family:var(--font-mono)">Base ID: ${base}</span>
+      </div>`;
+    } else {
+      const msg = data?.error?.message || `HTTP ${res.status}`;
+      el.innerHTML = `<div style="color:var(--danger-text);background:var(--danger-subtle);border:1px solid var(--danger);padding:var(--space-3) var(--space-4);border-radius:var(--radius-md)">
+        ❌ <strong>Error ${res.status}:</strong> ${msg}<br>
+        <span style="font-size:var(--text-xs)">Verifica que el token sea correcto y tenga acceso a esta base.</span>
+      </div>`;
+    }
+  } catch(e) {
+    el.innerHTML = `<div style="color:var(--danger-text);background:var(--danger-subtle);border:1px solid var(--danger);padding:var(--space-3) var(--space-4);border-radius:var(--radius-md)">
+      ❌ <strong>Error de red:</strong> ${e.message}
+    </div>`;
+  }
 }
 
 function fillConfigForm() {
@@ -714,10 +749,36 @@ function getClienteNombre(id) {
    DASHBOARD
 ══════════════════════════════════ */
 async function loadDashboard() {
+  document.getElementById('kpi-grid').innerHTML = '<div class="loading-overlay"><div class="spinner spinner-lg"></div></div>';
+  document.getElementById('dash-charts').style.display = 'none';
+
+  if (!AppConfig.AIRTABLE_TOKEN) {
+    document.getElementById('kpi-grid').innerHTML = `<div style="color:var(--warning-text);padding:var(--space-4)">⚠️ Configura tu Airtable Token en <a href="#" onclick="navigate('config')" style="color:var(--accent-text)">Configuración</a> para comenzar.</div>`;
+    return;
+  }
+
+  let clientes = [], cotizaciones = [], invoices = [], logs = [];
+  const errores = [];
+
+  await Promise.all([
+    DB.getClientes().then(r => clientes = r).catch(e => errores.push(`Clientes: ${e.message}`)),
+    DB.getCotizaciones().then(r => cotizaciones = r).catch(e => errores.push(`Cotizaciones: ${e.message}`)),
+    DB.getInvoices().then(r => invoices = r).catch(e => errores.push(`Invoices: ${e.message}`)),
+    DB.getLogs(10).then(r => logs = r).catch(e => errores.push(`Logs: ${e.message}`)),
+  ]);
+
+  if (errores.length) {
+    document.getElementById('kpi-grid').innerHTML = `
+      <div style="color:var(--danger-text);padding:var(--space-4);grid-column:1/-1">
+        <strong>❌ Error de conexión con Airtable:</strong><br>
+        <code style="font-size:var(--text-xs)">${errores.join('<br>')}</code><br><br>
+        <strong>Solución:</strong> Ve a <a href="#" onclick="navigate('config')" style="color:var(--accent-text)">Configuración</a>
+        → usa el botón <strong>"🔌 Probar conexión"</strong> para verificar tu token.
+      </div>`;
+    return;
+  }
+
   try {
-    const [clientes, cotizaciones, invoices, logs] = await Promise.all([
-      DB.getClientes(), DB.getCotizaciones(), DB.getInvoices(), DB.getLogs(10)
-    ]);
     AppState.clientes = clientes; AppState.cotizaciones = cotizaciones; AppState.invoices = invoices;
 
     const periodo = document.getElementById('dash-periodo').value;
@@ -783,7 +844,7 @@ async function loadDashboard() {
     const ts = new Date().toLocaleTimeString('es-MX');
     document.getElementById('sync-label').textContent = `Actualizado ${ts}`;
   } catch(e) {
-    document.getElementById('kpi-grid').innerHTML = `<div style="color:var(--danger-text);padding:var(--space-4)">Error: ${e.message}</div>`;
+    document.getElementById('kpi-grid').innerHTML = `<div style="color:var(--danger-text);padding:var(--space-4)">❌ Error: ${e.message}</div>`;
   }
 }
 
