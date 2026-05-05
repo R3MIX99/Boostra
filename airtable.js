@@ -120,8 +120,8 @@ const DB = (() => {
     const clauses = [];
     if (filtros.estado) clauses.push(`{Estado}="${filtros.estado}"`);
     if (filtros.clienteId) clauses.push(`FIND("${filtros.clienteId}", ARRAYJOIN({ClienteID}))`);
-    const formula = clauses.length ? `?filterByFormula=AND(${clauses.join(',')})` : '';
-    const records = await fetchAll('Cotizaciones', formula + '&sort[0][field]=FechaCreacion&sort[0][direction]=desc');
+    const filter = clauses.length ? `filterByFormula=AND(${clauses.join(',')})&` : '';
+    const records = await fetchAll('Cotizaciones', `?${filter}sort[0][field]=FechaCreacion&sort[0][direction]=desc`);
     return records.map(r => ({ id: r.id, ...r.fields }));
   }
 
@@ -163,8 +163,8 @@ const DB = (() => {
     const clauses = [];
     if (filtros.estado) clauses.push(`{Estado}="${filtros.estado}"`);
     if (filtros.clienteId) clauses.push(`FIND("${filtros.clienteId}", ARRAYJOIN({ClienteID}))`);
-    const formula = clauses.length ? `?filterByFormula=AND(${clauses.join(',')})` : '';
-    const records = await fetchAll('Invoices', formula + '&sort[0][field]=FechaCreacion&sort[0][direction]=desc');
+    const filter = clauses.length ? `filterByFormula=AND(${clauses.join(',')})&` : '';
+    const records = await fetchAll('Invoices', `?${filter}sort[0][field]=FechaCreacion&sort[0][direction]=desc`);
     return records.map(r => ({ id: r.id, ...r.fields }));
   }
 

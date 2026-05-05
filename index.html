@@ -1037,7 +1037,12 @@ function showCotizacionForm(cotId) {
 
 function addCotItem() { cotItems.push({descripcion:'',cantidad:1,precioUnitario:0}); renderCotItems(); updateCotTotales(); }
 function removeCotItem(i) { cotItems.splice(i,1); if(!cotItems.length) addCotItem(); else { renderCotItems(); updateCotTotales(); } }
-function updateCotItem(i,field,val) { cotItems[i][field]=field==='descripcion'?val:parseFloat(val)||0; updateCotTotales(); }
+function updateCotItem(i,field,val) {
+  cotItems[i][field]=field==='descripcion'?val:parseFloat(val)||0;
+  const subEl = document.getElementById('cot-sub-'+i);
+  if (subEl) subEl.textContent = DB.formatearMoneda(cotItems[i].cantidad * cotItems[i].precioUnitario);
+  updateCotTotales();
+}
 
 function renderCotItems() {
   document.getElementById('cot-items-tbody').innerHTML = cotItems.map((it,i)=>`
@@ -1045,7 +1050,7 @@ function renderCotItems() {
       <td><input class="form-input" value="${it.descripcion}" placeholder="Descripción del servicio" oninput="updateCotItem(${i},'descripcion',this.value)" style="min-width:180px"></td>
       <td><input class="form-input" type="number" value="${it.cantidad}" min="0" step="0.01" oninput="updateCotItem(${i},'cantidad',this.value)" style="width:80px"></td>
       <td><input class="form-input" type="number" value="${it.precioUnitario}" min="0" step="0.01" oninput="updateCotItem(${i},'precioUnitario',this.value)" style="width:130px"></td>
-      <td class="num">${DB.formatearMoneda(it.cantidad*it.precioUnitario)}</td>
+      <td class="num" id="cot-sub-${i}">${DB.formatearMoneda(it.cantidad*it.precioUnitario)}</td>
       <td><button type="button" class="btn btn-ghost btn-sm" onclick="removeCotItem(${i})">✕</button></td>
     </tr>`).join('');
 }
@@ -1219,14 +1224,19 @@ function showInvoiceForm(invId) {
 
 function addInvItem() { invItems.push({descripcion:'',cantidad:1,precioUnitario:0}); renderInvItems(); updateInvTotales(); }
 function removeInvItem(i) { invItems.splice(i,1); if(!invItems.length) addInvItem(); else { renderInvItems(); updateInvTotales(); } }
-function updateInvItem(i,field,val) { invItems[i][field]=field==='descripcion'?val:parseFloat(val)||0; updateInvTotales(); }
+function updateInvItem(i,field,val) {
+  invItems[i][field]=field==='descripcion'?val:parseFloat(val)||0;
+  const subEl = document.getElementById('inv-sub-'+i);
+  if (subEl) subEl.textContent = DB.formatearMoneda(invItems[i].cantidad * invItems[i].precioUnitario);
+  updateInvTotales();
+}
 function renderInvItems() {
   document.getElementById('inv-items-tbody').innerHTML = invItems.map((it,i)=>`
     <tr>
       <td><input class="form-input" value="${it.descripcion}" placeholder="Descripción" oninput="updateInvItem(${i},'descripcion',this.value)" style="min-width:180px"></td>
       <td><input class="form-input" type="number" value="${it.cantidad}" min="0" step="0.01" oninput="updateInvItem(${i},'cantidad',this.value)" style="width:80px"></td>
       <td><input class="form-input" type="number" value="${it.precioUnitario}" min="0" step="0.01" oninput="updateInvItem(${i},'precioUnitario',this.value)" style="width:130px"></td>
-      <td class="num">${DB.formatearMoneda(it.cantidad*it.precioUnitario)}</td>
+      <td class="num" id="inv-sub-${i}">${DB.formatearMoneda(it.cantidad*it.precioUnitario)}</td>
       <td><button type="button" class="btn btn-ghost btn-sm" onclick="removeInvItem(${i})">✕</button></td>
     </tr>`).join('');
 }
