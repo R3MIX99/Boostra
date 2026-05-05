@@ -68,11 +68,11 @@
         "tableId": "tblW1ndG08XySoYed",
         "fieldsUi": {
           "fieldValues": [
-            { "fieldId": "fldQb32FZEuXCgtFW", "fieldValue": "=Aviso mensual enviado a {{ $('Airtable — Obtener Clientes Activos').all().length }} clientes" },
-            { "fieldId": "fldH5pyUQ0JwM1Ezv", "fieldValue": "={{ new Date().toISOString() }}" },
-            { "fieldId": "fldUV5hc3PSeZhAyB", "fieldValue": "aviso_mensual" },
-            { "fieldId": "fldATicPxX4S5Zrrs", "fieldValue": "enviado" },
-            { "fieldId": "fldmrtslRazqrNhjA", "fieldValue": "={{ $('Airtable — Obtener Clientes Activos').all().length }}" }
+            { "fieldId": "Descripcion", "fieldValue": "=Aviso mensual enviado a {{ $('Airtable — Obtener Clientes Activos').all().length }} clientes" },
+            { "fieldId": "Fecha", "fieldValue": "={{ new Date().toISOString() }}" },
+            { "fieldId": "Tipo", "fieldValue": "aviso_mensual" },
+            { "fieldId": "Estado", "fieldValue": "enviado" },
+            { "fieldId": "CantidadAfectados", "fieldValue": "={{ $('Airtable — Obtener Clientes Activos').all().length }}" }
           ]
         }
       },

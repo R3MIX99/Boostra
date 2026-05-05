@@ -35,7 +35,7 @@
         "id": "={{ $('Webhook').item.json.body.invoiceId }}",
         "fieldsUi": {
           "fieldValues": [
-            { "fieldId": "fldea7FOx3xL5Aer4", "fieldValue": "={{ new Date().toISOString().split('T')[0] }}" }
+            { "fieldId": "UltimoRecordatorio", "fieldValue": "={{ new Date().toISOString().split('T')[0] }}" }
           ]
         }
       },

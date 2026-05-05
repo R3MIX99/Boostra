@@ -35,7 +35,7 @@
         "id": "={{ $('Webhook').item.json.body.cotizacionId }}",
         "fieldsUi": {
           "fieldValues": [
-            { "fieldId": "fldSA2vWcceCScwtI", "fieldValue": "={{ new Date().toISOString().split('T')[0] }}" }
+            { "fieldId": "UltimoSeguimiento", "fieldValue": "={{ new Date().toISOString().split('T')[0] }}" }
           ]
         }
       },

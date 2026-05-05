@@ -21,8 +21,8 @@
         "id": "={{ $json.body.cotizacionId }}",
         "fieldsUi": {
           "fieldValues": [
-            { "fieldId": "fldfdwaAqdPdVDYGM", "fieldValue": "Enviada" },
-            { "fieldId": "fldnJiS6pMcuV0Br9", "fieldValue": "={{ new Date().toISOString().split('T')[0] }}" }
+            { "fieldId": "Estado", "fieldValue": "Enviada" },
+            { "fieldId": "FechaEnvio", "fieldValue": "={{ new Date().toISOString().split('T')[0] }}" }
           ]
         }
       },
