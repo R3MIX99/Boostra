@@ -506,6 +506,10 @@
               <input class="form-input" id="cfg-anthropic" type="password" placeholder="sk-ant-api03-...">
               <span class="token-hint">Obtén tu key en console.anthropic.com — se usa para generar propuestas con IA en cotizaciones</span>
             </div>
+            <div class="form-group">
+              <label class="form-label">Webhook: Generar propuesta IA</label>
+              <input class="form-input" id="cfg-wh5" placeholder="/webhook/generar-propuesta">
+            </div>
           </div>
         </div>
         <div class="config-section">
@@ -794,7 +798,8 @@ function loadConfig() {
     NOMBRE:         c.name  || 'Mi Negocio',
     EMAIL:          c.email || '',
     LOGO:           c.logo  || '',
-    ANTHROPIC_KEY:  c.anthropic || ''
+    ANTHROPIC_KEY:  c.anthropic || '',
+    WH_IA:          c.wh5   || ''
   };
   return !!c.token;
 }
@@ -811,7 +816,8 @@ function saveConfig() {
     name:  document.getElementById('cfg-name').value.trim(),
     email: document.getElementById('cfg-email').value.trim(),
     logo:  document.getElementById('cfg-logo').value.trim(),
-    anthropic: document.getElementById('cfg-anthropic').value.trim()
+    anthropic: document.getElementById('cfg-anthropic').value.trim(),
+    wh5:   document.getElementById('cfg-wh5').value.trim()
   };
   localStorage.setItem('appConfig', JSON.stringify(cfg));
   loadConfig();
@@ -864,6 +870,7 @@ function fillConfigForm() {
   document.getElementById('cfg-email').value = c.email || '';
   document.getElementById('cfg-logo').value      = c.logo      || '';
   document.getElementById('cfg-anthropic').value = c.anthropic || '';
+  document.getElementById('cfg-wh5').value        = c.wh5       || '';
 }
 
 /* ══════════════════════════════════
@@ -1899,48 +1906,25 @@ function exportCotPDF(id) {
 async function generarConIA(descripcion, clienteNombre, items) {
   const apiKey = AppConfig.ANTHROPIC_KEY;
   if (!apiKey) throw new Error('Configura tu Anthropic API Key en Configuración → Inteligencia Artificial');
-  const itemsList = items.filter(it=>it.descripcion).map(it=>`• ${it.descripcion}${it.cantidad>1?' (×'+it.cantidad+')':''}${it.precioUnitario?' — $'+parseFloat(it.precioUnitario).toLocaleString('es-MX'):''}`).join('\n') || '• '+descripcion;
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+  const wh = AppConfig.WH_IA;
+  if (!AppConfig.N8N_URL || !wh) throw new Error('Configura la URL de n8n y el Webhook: Generar propuesta IA en Configuración');
+  const res = await fetch(`${AppConfig.N8N_URL}${wh}`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-allow-browser': 'true'
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1200,
-      messages: [{ role: 'user', content: `Eres un especialista en propuestas comerciales para agencias y freelancers. Redacta una propuesta profesional en español para incluir en una cotización.
-
-CLIENTE: ${clienteNombre || 'Cliente'}
-PROYECTO: ${descripcion}
-SERVICIOS:
-${itemsList}
-
-Genera la propuesta con estas secciones en Markdown:
-
-## Resumen del Proyecto
-Describe en 2-3 oraciones el objetivo y el valor que entregará este proyecto.
-
-## Alcance del Trabajo
-Detalla específicamente qué incluye cada servicio. Sé concreto y usa bullets.
-
-## Entregables
-Lista en bullets lo que recibirá el cliente al finalizar el proyecto.
-
-## Proceso de Trabajo
-Explica brevemente las etapas, revisiones y forma de comunicación.
-
-Máximo 380 palabras. Tono profesional y orientado a resultados. No menciones precios.` }]
+      apiKey,
+      descripcion,
+      clienteNombre: clienteNombre || 'Cliente',
+      items: items.filter(it => it.descripcion)
     })
   });
   if (!res.ok) {
-    const e = await res.json().catch(()=>({}));
-    throw new Error(e.error?.message || `Error ${res.status} de la API de Anthropic`);
+    const e = await res.json().catch(() => ({}));
+    throw new Error(e.error || `Error ${res.status} del servidor`);
   }
   const d = await res.json();
-  return d.content?.[0]?.text || '';
+  if (!d.ok) throw new Error(d.error || 'Error generando propuesta');
+  return d.scope || '';
 }
 
 async function triggerGenerarConIA() {

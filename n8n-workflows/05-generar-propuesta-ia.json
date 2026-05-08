@@ -1,0 +1,62 @@
+{
+  "name": "05 — Generar Propuesta con IA",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "generar-propuesta",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $input.first().json.body;\nconst desc = b.descripcion || '';\nconst cliente = b.clienteNombre || 'Cliente';\nconst items = (b.items || []).filter(it => it.descripcion);\nconst lista = items.length\n  ? items.map(it => '• ' + it.descripcion + (it.cantidad > 1 ? ' (×' + it.cantidad + ')' : '') + (it.precioUnitario ? ' — $' + parseFloat(it.precioUnitario).toLocaleString('es-MX') : '')).join('\\n')\n  : '• ' + desc;\n\nconst prompt = `Eres un especialista en propuestas comerciales para agencias y freelancers. Redacta una propuesta profesional en español para incluir en una cotización.\\n\\nCLIENTE: ${cliente}\\nPROYECTO: ${desc}\\nSERVICIOS:\\n${lista}\\n\\nGenera la propuesta con estas secciones en Markdown:\\n\\n## Resumen del Proyecto\\nDescribe en 2-3 oraciones el objetivo y el valor que entregará este proyecto al cliente.\\n\\n## Alcance del Trabajo\\nDetalla específicamente qué incluye cada servicio. Usa bullets concretos y orientados al cliente.\\n\\n## Entregables\\nLista en bullets lo que recibirá el cliente al finalizar el proyecto.\\n\\n## Proceso de Trabajo\\nExplica brevemente las etapas, revisiones incluidas y forma de comunicación.\\n\\nMáximo 380 palabras. Tono profesional y orientado a resultados. No menciones precios.`;\n\nreturn [{ json: { prompt, apiKey: b.apiKey } }];"
+      },
+      "name": "Code — Build Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key", "value": "={{ $json.apiKey }}" },
+            { "name": "anthropic-version", "value": "2023-06-01" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 1200, messages: [{ role: 'user', content: $json.prompt }] }) }}"
+      },
+      "name": "HTTP — Claude API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true, scope: $json.content[0].text }) }}"
+      },
+      "name": "Respuesta OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [900, 300]
+    }
+  ],
+  "connections": {
+    "Webhook":             { "main": [[{ "node": "Code — Build Prompt", "type": "main", "index": 0 }]] },
+    "Code — Build Prompt": { "main": [[{ "node": "HTTP — Claude API",   "type": "main", "index": 0 }]] },
+    "HTTP — Claude API":   { "main": [[{ "node": "Respuesta OK",         "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}
