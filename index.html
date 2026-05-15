@@ -674,17 +674,19 @@ const DB = (() => {
 
   async function handleResponse(res) {
     if (res.ok) return res.json();
+    let body = {};
+    try { body = await res.json(); } catch {}
+    const airtableMsg = body?.error?.message || body?.error?.type || '';
     let msg;
     switch (res.status) {
-      case 401: msg = 'Token inválido. Revisa AIRTABLE_TOKEN'; break;
+      case 401: msg = 'Token inválido. Revisa tu Airtable Token en Configuración'; break;
       case 403: msg = 'Sin permisos. Verifica que el token tenga acceso a esta base'; break;
-      case 404: msg = 'Registro no encontrado'; break;
-      case 422: msg = 'Error en los datos enviados a Airtable'; break;
+      case 404: msg = airtableMsg ? `No encontrado: ${airtableMsg}` : 'Tabla o registro no encontrado. Verifica el BASE ID en Configuración'; break;
+      case 422: msg = airtableMsg ? `Datos inválidos: ${airtableMsg}` : 'Error en los datos enviados a Airtable'; break;
       case 429: msg = 'Límite de requests alcanzado. Espera un momento'; break;
-      default:  msg = `Error ${res.status} de Airtable`;
+      default:  msg = airtableMsg || `Error ${res.status} de Airtable`;
     }
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body?.error?.message || msg);
+    throw new Error(msg);
   }
 
   async function fetchAll(table, params = '') {
@@ -887,10 +889,10 @@ const DB = (() => {
   }
 
   async function crearFinanza(data) {
-    const res = await fetch(`${baseUrl()}/Finanzas`, {
-      method: 'POST', headers: headers(),
-      body: JSON.stringify({ fields: data })
-    }).then(handleResponse);
+    const url = `${baseUrl()}/Finanzas`;
+    const body = JSON.stringify({ fields: data });
+    console.log('[crearFinanza] POST', url, JSON.parse(body));
+    const res = await fetch(url, { method: 'POST', headers: headers(), body }).then(handleResponse);
     return { id: res.id, ...res.fields };
   }
 
@@ -2387,7 +2389,10 @@ async function submitFinanza(id) {
     else    { await DB.crearFinanza(data);           toast('Movimiento registrado','success'); }
     closeModal();
     loadFinanzas();
-  } catch(e) { toast('Error al guardar: '+e.message,'error'); }
+  } catch(e) {
+    console.error('[Finanzas] Error guardando:', e, { id, data, BASE_ID: AppConfig.BASE_ID });
+    toast('Error al guardar: ' + e.message, 'error');
+  }
 }
 
 async function deleteFinanza(id) {
