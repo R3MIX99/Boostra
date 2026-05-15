@@ -6,171 +6,290 @@
         "updates": ["message"],
         "additionalFields": {}
       },
-      "name": "Telegram Trigger",
       "type": "n8n-nodes-base.telegramTrigger",
-      "typeVersion": 1,
-      "position": [240, 300],
-      "credentials": { "telegramApi": { "id": "1", "name": "Telegram Bot" } }
-    },
-    {
-      "parameters": {
-        "jsCode": "const msg = $input.first().json.message;\nconst chatId = msg.chat.id;\nconst isVoice = !!(msg.voice || msg.audio);\nconst fileId = isVoice ? (msg.voice?.file_id || msg.audio?.file_id) : null;\nconst text = msg.text || '';\nreturn [{ json: { chatId, isVoice, fileId, text } }];"
-      },
-      "name": "Code — Parse Message",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [460, 300]
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "boolean": [
-            { "value1": "={{ $json.isVoice }}", "value2": true }
-          ]
+      "typeVersion": 1.2,
+      "position": [2160, 720],
+      "id": "eaee3b18-c043-4300-91f7-b0eef5105a03",
+      "name": "Telegram Trigger1",
+      "webhookId": "5fabb8e9-0abb-4d5d-8837-28fbfe40f6ac",
+      "credentials": {
+        "telegramApi": {
+          "id": "nOVErCBQksKbhQco",
+          "name": "Bostra Assistant"
         }
-      },
-      "name": "Switch — Audio o Texto",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 1,
-      "position": [680, 300]
+      }
     },
     {
       "parameters": {
-        "method": "GET",
-        "url": "={{ 'https://api.telegram.org/bot' + $vars.TELEGRAM_BOT_TOKEN + '/getFile?file_id=' + $json.fileId }}",
-        "options": {}
-      },
-      "name": "HTTP — Get File Path",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
-      "position": [900, 200]
-    },
-    {
-      "parameters": {
-        "method": "GET",
-        "url": "={{ 'https://api.telegram.org/file/bot' + $vars.TELEGRAM_BOT_TOKEN + '/' + $json.result.file_path }}",
-        "options": { "response": { "response": { "responseFormat": "file" } } }
-      },
-      "name": "HTTP — Download Audio",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
-      "position": [1120, 200]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "https://api.openai.com/v1/audio/transcriptions",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "Authorization", "value": "={{ 'Bearer ' + $vars.OPENAI_API_KEY }}" }
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.message.text }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "exists",
+                      "singleValue": true
+                    },
+                    "id": "5dd7dd9d-f540-40c1-8ca8-478d984ce243"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "texto"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "320a11f7-3970-45fc-ae28-b51a18a83287",
+                    "leftValue": "={{ $json.message.voice }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "object",
+                      "operation": "exists",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "audio"
+            }
           ]
         },
-        "sendBody": true,
-        "contentType": "multipart-form-data",
-        "bodyParameters": {
-          "parameters": [
-            { "name": "model", "value": "whisper-1" },
-            { "name": "language", "value": "es" },
-            { "name": "file", "value": "={{ $binary.data }}", "parameterType": "formBinaryData" }
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [2368, 720],
+      "id": "6026db57-1f06-4700-8f7d-d0f5ef3af9c6",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "34b13f73-c51b-433e-81ff-34e3b1b0d2cc",
+              "name": "mensaje",
+              "value": "={{ $json.message.text }}",
+              "type": "string"
+            }
           ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2784, 608],
+      "id": "28f9d4c2-5e9e-4eb0-afb8-9147678a4871",
+      "name": "Mensaje de usuario"
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $json.message.voice.file_id }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [2688, 864],
+      "id": "73bd6572-864e-444c-ba04-f6dc264c79f0",
+      "name": "Descargar audio",
+      "webhookId": "a89c21b0-b031-4ef8-9711-25c781389b90",
+      "credentials": {
+        "telegramApi": {
+          "id": "nOVErCBQksKbhQco",
+          "name": "Bostra Assistant"
         }
-      },
-      "name": "HTTP — Whisper Transcribe",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
-      "position": [1340, 200]
+      }
     },
     {
       "parameters": {
-        "jsCode": "const chatId = $('Code — Parse Message').first().json.chatId;\nconst transcribed = $input.first().json.text || '';\nconst rawText = transcribed;\nreturn [{ json: { chatId, rawText } }];"
+        "resource": "audio",
+        "operation": "transcribe",
+        "options": {}
       },
-      "name": "Code — Merge Audio Text",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [1560, 200]
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [2912, 864],
+      "id": "953c2b17-7cea-44c5-ba6d-0748dc7386a9",
+      "name": "Transcribe a recording",
+      "credentials": {
+        "openAiApi": {
+          "id": "beSfJRNSm1Wgo7QV",
+          "name": "OpenAi account"
+        }
+      }
     },
     {
       "parameters": {
-        "jsCode": "const chatId = $('Code — Parse Message').first().json.chatId;\nconst rawText = $('Code — Parse Message').first().json.text;\nreturn [{ json: { chatId, rawText } }];"
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0198fb11-cf6f-45bf-9680-d70342ff6f78",
+              "name": "raw_data",
+              "value": "={{ $json.text || $json.mensaje }}",
+              "type": "string"
+            },
+            {
+              "id": "9383e11f-d023-4f12-8c5f-73040def4457",
+              "name": "usuario",
+              "value": "={{ $('Telegram Trigger1').item.json.message.chat.id }}",
+              "type": "string"
+            },
+            {
+              "id": "10b9df12-63d8-4e85-a6f6-e7aa0cc5bd31",
+              "name": "date",
+              "value": "={{ $now.format('dd-MM-yyyy') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
       },
-      "name": "Code — Pass Text",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [900, 400]
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [3136, 720],
+      "id": "a4dc97dd-6cd1-49c6-b66a-0b3d01c2b23f",
+      "name": "Mensaje, usuario y date"
     },
     {
       "parameters": {
         "method": "POST",
         "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "x-api-key", "value": "={{ $vars.ANTHROPIC_API_KEY }}" },
-            { "name": "anthropic-version", "value": "2023-06-01" }
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 400, messages: [{ role: 'user', content: `Extrae los datos financieros del siguiente mensaje y responde SOLO con JSON válido sin explicaciones adicionales.\n\nMensaje: \"${$json.rawText}\"\n\nResponde con este formato exacto:\n{\"tipo\": \"Gasto|Ingreso|Inversion\", \"descripcion\": \"descripción corta\", \"monto\": 0.00, \"moneda\": \"MXN|USD\", \"categoria\": \"Comida y restaurantes|Transporte|Entretenimiento|Clientes / Negocio|Servicios|Salud|Tecnologia|Viajes|Ropa|Otros\", \"metodoPago\": \"Efectivo|Debito|Credito|Transferencia / SPEI\", \"fecha\": \"YYYY-MM-DD\"}\n\nReglas:\n- fecha: usa la fecha de hoy si no se menciona (${new Date().toISOString().slice(0,10)})\n- moneda: MXN por defecto\n- metodoPago: Efectivo por defecto si no se menciona\n- Si es inversión omite metodoPago y categoria` }] }) }}"
+        "jsonBody": "={{ JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 400, messages: [{ role: 'user', content: `Extrae los datos financieros del siguiente mensaje y responde SOLO con JSON válido sin explicaciones adicionales.\n\nMensaje: \"${$json.raw_data}\"\n\nResponde con este formato exacto:\n{\"tipo\": \"Gasto|Ingreso|Inversion\", \"descripcion\": \"descripción corta\", \"monto\": 0.00, \"moneda\": \"MXN|USD\", \"categoria\": \"Comida y restaurantes|Transporte|Entretenimiento|Clientes / Negocio|Servicios|Salud|Tecnologia|Viajes|Ropa|Otros\", \"metodoPago\": \"Efectivo|Debito|Credito|Transferencia / SPEI\", \"fecha\": \"YYYY-MM-DD\"}\n\nReglas:\n- fecha: usa la fecha de hoy si no se menciona (${new Date().toISOString().slice(0,10)})\n- moneda: MXN por defecto\n- metodoPago: Efectivo por defecto si no se menciona\n- Si es inversión omite metodoPago y categoria` }] }) }}",
+        "options": {}
       },
       "name": "HTTP — Claude Extract",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [1780, 300]
+      "position": [3392, 720],
+      "id": "b837594d-874c-4a3d-b6d5-2d06d416b29d",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ANTHROPIC_CRED_ID",
+          "name": "Anthropic API Key"
+        }
+      }
     },
     {
       "parameters": {
-        "jsCode": "const chatId = $('Code — Merge Audio Text').first()?.json?.chatId || $('Code — Pass Text').first()?.json?.chatId;\nlet extracted;\ntry {\n  const raw = $input.first().json.content[0].text.trim();\n  const jsonMatch = raw.match(/\\{[\\s\\S]*\\}/);\n  extracted = JSON.parse(jsonMatch ? jsonMatch[0] : raw);\n} catch(e) {\n  return [{ json: { chatId, error: 'No pude entender el mensaje. Intenta de nuevo con el formato: \"Gasté $150 en comida con débito\"' } }];\n}\nreturn [{ json: { chatId, extracted, ok: true } }];"
+        "jsCode": "const chatId = $('Mensaje, usuario y date').first().json.usuario;\nlet extracted;\ntry {\n  const raw = $input.first().json.content[0].text.trim();\n  const jsonMatch = raw.match(/\\{[\\s\\S]*\\}/);\n  extracted = JSON.parse(jsonMatch ? jsonMatch[0] : raw);\n} catch(e) {\n  return [{ json: { chatId, error: 'No pude entender el mensaje. Intenta de nuevo: \"Gasté $150 en comida con débito\"' } }];\n}\nreturn [{ json: { chatId, extracted, ok: true } }];"
       },
       "name": "Code — Parse Claude Response",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2000, 300]
+      "position": [3616, 720],
+      "id": "9f8f41c9-a317-440b-aac9-ef752e5e4845"
     },
     {
       "parameters": {
         "conditions": {
           "boolean": [
-            { "value1": "={{ $json.ok }}", "value2": true }
+            {
+              "value1": "={{ $json.ok }}",
+              "value2": true
+            }
           ]
         }
       },
       "name": "Switch — Valid?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
-      "position": [2220, 300]
+      "position": [3840, 720],
+      "id": "2edf55bf-5960-46c1-9faf-bb7cb1f572f8"
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "={{ 'https://api.airtable.com/v0/' + $vars.AIRTABLE_BASE_ID + '/Finanzas' }}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "Authorization", "value": "={{ 'Bearer ' + $vars.AIRTABLE_TOKEN }}" }
-          ]
+        "operation": "create",
+        "base": {
+          "value": "appnenFMauShRa5hl",
+          "mode": "id"
         },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ fields: { Descripcion: $json.extracted.descripcion, Tipo: $json.extracted.tipo, Monto: $json.extracted.monto, Moneda: $json.extracted.moneda || 'MXN', Fecha: $json.extracted.fecha, Categoria: $json.extracted.categoria, MetodoPago: $json.extracted.metodoPago, Fuente: 'Telegram' } }) }}"
+        "table": {
+          "value": "tblMEVgSKbynwv6Uv",
+          "mode": "id"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Descripcion": "={{ $json.extracted.descripcion }}",
+            "Tipo": "={{ $json.extracted.tipo }}",
+            "Monto": "={{ $json.extracted.monto }}",
+            "Moneda": "={{ $json.extracted.moneda || 'MXN' }}",
+            "Fecha": "={{ $json.extracted.fecha }}",
+            "Categoria": "={{ $json.extracted.categoria }}",
+            "MetodoPago": "={{ $json.extracted.metodoPago }}",
+            "Fuente": "Telegram"
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
       },
-      "name": "HTTP — Create Airtable Record",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
-      "position": [2440, 200]
+      "name": "Airtable — Guardar Finanza",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [4064, 608],
+      "id": "9e12fd3b-c5f7-45ac-b28f-927d7e6764d0",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "AIRTABLE_CRED_ID",
+          "name": "Airtable account"
+        }
+      }
     },
     {
       "parameters": {
         "chatId": "={{ $('Code — Parse Claude Response').first().json.chatId }}",
-        "text": "=✅ *{{ $('Code — Parse Claude Response').first().json.extracted.tipo }}* registrado\\n\\n📝 {{ $('Code — Parse Claude Response').first().json.extracted.descripcion }}\\n💰 ${{ $('Code — Parse Claude Response').first().json.extracted.monto }} {{ $('Code — Parse Claude Response').first().json.extracted.moneda || 'MXN' }}\\n📅 {{ $('Code — Parse Claude Response').first().json.extracted.fecha }}\\n🏷️ {{ $('Code — Parse Claude Response').first().json.extracted.categoria || '' }}",
-        "additionalFields": { "parse_mode": "Markdown" }
+        "text": "=✅ *{{ $('Code — Parse Claude Response').first().json.extracted.tipo }}* registrado\n\n📝 {{ $('Code — Parse Claude Response').first().json.extracted.descripcion }}\n💰 ${{ $('Code — Parse Claude Response').first().json.extracted.monto }} {{ $('Code — Parse Claude Response').first().json.extracted.moneda || 'MXN' }}\n📅 {{ $('Code — Parse Claude Response').first().json.extracted.fecha }}\n🏷️ {{ $('Code — Parse Claude Response').first().json.extracted.categoria || '' }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
       },
       "name": "Telegram — Confirm OK",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1,
-      "position": [2660, 200],
-      "credentials": { "telegramApi": { "id": "1", "name": "Telegram Bot" } }
+      "position": [4288, 608],
+      "id": "256378de-5b93-4698-8373-68c78be6fa8b",
+      "credentials": {
+        "telegramApi": {
+          "id": "nOVErCBQksKbhQco",
+          "name": "Bostra Assistant"
+        }
+      }
     },
     {
       "parameters": {
@@ -181,33 +300,94 @@
       "name": "Telegram — Send Error",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1,
-      "position": [2440, 400],
-      "credentials": { "telegramApi": { "id": "1", "name": "Telegram Bot" } }
+      "position": [4064, 848],
+      "id": "a4be944b-64ff-4599-8b84-6812cbecae09",
+      "credentials": {
+        "telegramApi": {
+          "id": "nOVErCBQksKbhQco",
+          "name": "Bostra Assistant"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Transcribe el audio o elige texto\n**Guarda el mensaje del usuario en texto plano**\n\n`raw_data` = texto directo o transcripción de Whisper\n`usuario` = chat ID de Telegram\n`date` = fecha de hoy",
+        "height": 560,
+        "width": 1200
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [2096, 480],
+      "typeVersion": 1,
+      "id": "aa98cf59-f9a2-4802-872a-b053da949ab1",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## Extrae datos con Claude → guarda en Airtable\n\n⚠️ **Antes de activar, configura 2 credenciales en n8n:**\n\n**1. Anthropic API Key**\nSettings → Credentials → New → *Header Auth*\n· Name: `x-api-key`\n· Value: tu clave `sk-ant-...`\nLuego selecciónala en el nodo *HTTP — Claude Extract*\n\n**2. Airtable**\nSettings → Credentials → New → *Airtable Personal Access Token*\n· Token: tu token `pat...`\nLuego selecciónala en el nodo *Airtable — Guardar Finanza*",
+        "height": 560,
+        "width": 1280,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [3328, 480],
+      "typeVersion": 1,
+      "id": "3b1d10d8-2808-4fe5-aa7e-3e72c9e34837",
+      "name": "Sticky Note1"
     }
   ],
+  "pinData": {},
   "connections": {
-    "Telegram Trigger":          { "main": [[{ "node": "Code — Parse Message",     "type": "main", "index": 0 }]] },
-    "Code — Parse Message":      { "main": [[{ "node": "Switch — Audio o Texto",   "type": "main", "index": 0 }]] },
-    "Switch — Audio o Texto":    {
+    "Telegram Trigger1": {
+      "main": [[{ "node": "Switch", "type": "main", "index": 0 }]]
+    },
+    "Switch": {
       "main": [
-        [{ "node": "HTTP — Get File Path",    "type": "main", "index": 0 }],
-        [{ "node": "Code — Pass Text",        "type": "main", "index": 0 }]
+        [{ "node": "Mensaje de usuario", "type": "main", "index": 0 }],
+        [{ "node": "Descargar audio",    "type": "main", "index": 0 }]
       ]
     },
-    "HTTP — Get File Path":      { "main": [[{ "node": "HTTP — Download Audio",    "type": "main", "index": 0 }]] },
-    "HTTP — Download Audio":     { "main": [[{ "node": "HTTP — Whisper Transcribe","type": "main", "index": 0 }]] },
-    "HTTP — Whisper Transcribe": { "main": [[{ "node": "Code — Merge Audio Text",  "type": "main", "index": 0 }]] },
-    "Code — Merge Audio Text":   { "main": [[{ "node": "HTTP — Claude Extract",    "type": "main", "index": 0 }]] },
-    "Code — Pass Text":          { "main": [[{ "node": "HTTP — Claude Extract",    "type": "main", "index": 0 }]] },
-    "HTTP — Claude Extract":     { "main": [[{ "node": "Code — Parse Claude Response","type": "main", "index": 0 }]] },
-    "Code — Parse Claude Response":{ "main": [[{ "node": "Switch — Valid?",        "type": "main", "index": 0 }]] },
+    "Mensaje de usuario": {
+      "main": [[{ "node": "Mensaje, usuario y date", "type": "main", "index": 0 }]]
+    },
+    "Descargar audio": {
+      "main": [[{ "node": "Transcribe a recording", "type": "main", "index": 0 }]]
+    },
+    "Transcribe a recording": {
+      "main": [[{ "node": "Mensaje, usuario y date", "type": "main", "index": 0 }]]
+    },
+    "Mensaje, usuario y date": {
+      "main": [[{ "node": "HTTP — Claude Extract", "type": "main", "index": 0 }]]
+    },
+    "HTTP — Claude Extract": {
+      "main": [[{ "node": "Code — Parse Claude Response", "type": "main", "index": 0 }]]
+    },
+    "Code — Parse Claude Response": {
+      "main": [[{ "node": "Switch — Valid?", "type": "main", "index": 0 }]]
+    },
     "Switch — Valid?": {
       "main": [
-        [{ "node": "HTTP — Create Airtable Record", "type": "main", "index": 0 }],
-        [{ "node": "Telegram — Send Error",         "type": "main", "index": 0 }]
+        [{ "node": "Airtable — Guardar Finanza", "type": "main", "index": 0 }],
+        [{ "node": "Telegram — Send Error",       "type": "main", "index": 0 }]
       ]
     },
-    "HTTP — Create Airtable Record": { "main": [[{ "node": "Telegram — Confirm OK","type": "main", "index": 0 }]] }
+    "Airtable — Guardar Finanza": {
+      "main": [[{ "node": "Telegram — Confirm OK", "type": "main", "index": 0 }]]
+    }
   },
-  "settings": { "executionOrder": "v1" }
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timeSavedMode": "fixed",
+    "timezone": "America/Mexico_City",
+    "callerPolicy": "workflowsFromSameOwner",
+    "executionTimeout": -1,
+    "availableInMCP": false
+  },
+  "versionId": "d21b6d3a-0317-4794-8774-d2681500e438",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7de42bfec74a523754a04b6c97d1d2da61349735ba0caac21b860b05678e36e0"
+  },
+  "id": "V0w9aIGANUQbtTtd",
+  "tags": []
 }
