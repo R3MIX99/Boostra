@@ -2036,10 +2036,6 @@ function generateCotPdfHtml(cot, clienteNombre, forPrint) {
     </table>
     ${totalsBlock}
     ${cot.FechaVencimiento?`<div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:6px;padding:12px 18px;margin-bottom:28px;font-size:13px;color:#92400e">Esta cotización es válida hasta el <strong>${DB.formatearFecha(cot.FechaVencimiento)}</strong>. Los precios pueden estar sujetos a cambios posterior a esta fecha.</div>`:''}
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:48px;margin-top:40px;padding-top:32px;border-top:1px solid #e5e7eb">
-      <div><div style="border-top:2px solid #e5e7eb;padding-top:10px"><div style="font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:1px">Firma del cliente</div><div style="font-size:14px;font-weight:600;color:#111827;margin-top:4px">${clienteNombre}</div></div></div>
-      <div><div style="border-top:2px solid #e5e7eb;padding-top:10px"><div style="font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:1px">Emisor</div><div style="font-size:14px;font-weight:600;color:#111827;margin-top:4px">${nombre}</div></div></div>
-    </div>
   </div>
   <div style="text-align:center;padding:22px 52px;color:#9ca3af;font-size:12px;border-top:1px solid #f3f4f6">Gracias por tu confianza &nbsp;·&nbsp; ${nombre} &nbsp;·&nbsp; ${email}</div>
 </div>
