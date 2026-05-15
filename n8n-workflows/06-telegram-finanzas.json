@@ -257,7 +257,9 @@
           "matchingColumns": [],
           "schema": []
         },
-        "options": {}
+        "options": {
+          "typecast": true
+        }
       },
       "name": "Airtable — Guardar Finanza",
       "type": "n8n-nodes-base.airtable",
