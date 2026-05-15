@@ -37,7 +37,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "={{ 'https://api.telegram.org/bot' + $env.TELEGRAM_BOT_TOKEN + '/getFile?file_id=' + $json.fileId }}",
+        "url": "={{ 'https://api.telegram.org/bot' + $vars.TELEGRAM_BOT_TOKEN + '/getFile?file_id=' + $json.fileId }}",
         "options": {}
       },
       "name": "HTTP — Get File Path",
@@ -48,7 +48,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "={{ 'https://api.telegram.org/file/bot' + $env.TELEGRAM_BOT_TOKEN + '/' + $json.result.file_path }}",
+        "url": "={{ 'https://api.telegram.org/file/bot' + $vars.TELEGRAM_BOT_TOKEN + '/' + $json.result.file_path }}",
         "options": { "response": { "response": { "responseFormat": "file" } } }
       },
       "name": "HTTP — Download Audio",
@@ -63,7 +63,7 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "={{ 'Bearer ' + $env.OPENAI_API_KEY }}" }
+            { "name": "Authorization", "value": "={{ 'Bearer ' + $vars.OPENAI_API_KEY }}" }
           ]
         },
         "sendBody": true,
@@ -106,7 +106,7 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "x-api-key", "value": "={{ $env.ANTHROPIC_API_KEY }}" },
+            { "name": "x-api-key", "value": "={{ $vars.ANTHROPIC_API_KEY }}" },
             { "name": "anthropic-version", "value": "2023-06-01" }
           ]
         },
@@ -144,11 +144,11 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ 'https://api.airtable.com/v0/' + $env.AIRTABLE_BASE_ID + '/Finanzas' }}",
+        "url": "={{ 'https://api.airtable.com/v0/' + $vars.AIRTABLE_BASE_ID + '/Finanzas' }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "={{ 'Bearer ' + $env.AIRTABLE_TOKEN }}" }
+            { "name": "Authorization", "value": "={{ 'Bearer ' + $vars.AIRTABLE_TOKEN }}" }
           ]
         },
         "sendBody": true,
