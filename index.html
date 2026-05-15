@@ -1079,7 +1079,7 @@ function navigate(route) {
   if (routeActions[route]) {
     actionBtn.style.display = '';
     actionBtn.textContent = routeActions[route];
-    actionBtn.onclick = { clientes: showClienteForm, cotizaciones: showCotizacionForm, invoices: showInvoiceForm, finanzas: () => showFinanzaForm() }[route];
+    actionBtn.onclick = { clientes: () => showClienteForm(), cotizaciones: () => showCotizacionForm(), invoices: () => showInvoiceForm(), finanzas: () => showFinanzaForm() }[route];
   } else {
     actionBtn.style.display = 'none';
   }
