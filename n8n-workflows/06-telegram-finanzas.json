@@ -14,7 +14,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const msg = $input.first().json.message;\nconst chatId = msg.chat.id;\nconst isVoice = !!(msg.voice || msg.audio);\nconst fileId = isVoice ? (msg.voice?.file_id || msg.audio?.file_id) : null;\nconst text = msg.text || '';\nreturn [{ json: { chatId, isVoice, fileId, text, botToken: $env.TELEGRAM_BOT_TOKEN || '' } }];"
+        "jsCode": "const msg = $input.first().json.message;\nconst chatId = msg.chat.id;\nconst isVoice = !!(msg.voice || msg.audio);\nconst fileId = isVoice ? (msg.voice?.file_id || msg.audio?.file_id) : null;\nconst text = msg.text || '';\nreturn [{ json: { chatId, isVoice, fileId, text } }];"
       },
       "name": "Code — Parse Message",
       "type": "n8n-nodes-base.code",
@@ -37,7 +37,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "=https://api.telegram.org/bot{{ $json.botToken }}/getFile?file_id={{ $json.fileId }}",
+        "url": "={{ 'https://api.telegram.org/bot' + $env.TELEGRAM_BOT_TOKEN + '/getFile?file_id=' + $json.fileId }}",
         "options": {}
       },
       "name": "HTTP — Get File Path",
@@ -48,7 +48,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "=https://api.telegram.org/file/bot{{ $('Code — Parse Message').first().json.botToken }}/{{ $json.result.file_path }}",
+        "url": "={{ 'https://api.telegram.org/file/bot' + $env.TELEGRAM_BOT_TOKEN + '/' + $json.result.file_path }}",
         "options": { "response": { "response": { "responseFormat": "file" } } }
       },
       "name": "HTTP — Download Audio",
@@ -63,7 +63,7 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "=Bearer {{ $env.OPENAI_API_KEY }}" }
+            { "name": "Authorization", "value": "={{ 'Bearer ' + $env.OPENAI_API_KEY }}" }
           ]
         },
         "sendBody": true,
@@ -83,7 +83,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Merge transcribed text (audio path) or direct text\nconst chatId = $('Code — Parse Message').first().json.chatId;\nconst transcribed = $input.first().json.text || '';\nconst rawText = transcribed;\nreturn [{ json: { chatId, rawText } }];"
+        "jsCode": "const chatId = $('Code — Parse Message').first().json.chatId;\nconst transcribed = $input.first().json.text || '';\nconst rawText = transcribed;\nreturn [{ json: { chatId, rawText } }];"
       },
       "name": "Code — Merge Audio Text",
       "type": "n8n-nodes-base.code",
@@ -144,11 +144,11 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://api.airtable.com/v0/{{ $env.AIRTABLE_BASE_ID }}/Finanzas",
+        "url": "={{ 'https://api.airtable.com/v0/' + $env.AIRTABLE_BASE_ID + '/Finanzas' }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "=Bearer {{ $env.AIRTABLE_TOKEN }}" }
+            { "name": "Authorization", "value": "={{ 'Bearer ' + $env.AIRTABLE_TOKEN }}" }
           ]
         },
         "sendBody": true,
