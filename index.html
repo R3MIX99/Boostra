@@ -908,12 +908,31 @@ const DB = (() => {
     await fetch(`${baseUrl()}/Finanzas/${id}`, { method: 'DELETE', headers: headers() }).then(handleResponse);
   }
 
+  async function getVariables() {
+    return (await fetchAll('Variables', '?sort[0][field]=Grupo&sort[0][direction]=asc')).map(r => ({
+      id: r.id, valor: r.fields.Valor || '', grupo: r.fields.Grupo || ''
+    }));
+  }
+
+  async function crearVariable(grupo, valor) {
+    const res = await fetch(`${baseUrl()}/Variables`, {
+      method: 'POST', headers: headers(),
+      body: JSON.stringify({ fields: { Valor: valor, Grupo: grupo } })
+    }).then(handleResponse);
+    return { id: res.id, valor: res.fields.Valor, grupo: res.fields.Grupo };
+  }
+
+  async function eliminarVariable(id) {
+    await fetch(`${baseUrl()}/Variables/${id}`, { method: 'DELETE', headers: headers() }).then(handleResponse);
+  }
+
   return {
     getClientes, getClienteById, crearCliente, actualizarCliente, eliminarCliente, eliminarCotizacion,
     getCotizaciones, getCotizacionById, crearCotizacion, actualizarCotizacion,
     getInvoices, getInvoiceById, crearInvoice, eliminarInvoice, registrarPago, actualizarEstadoInvoice,
     getLogs, registrarLog,
     getFinanzas, crearFinanza, actualizarFinanza, eliminarFinanza,
+    getVariables, crearVariable, eliminarVariable,
     parsearItems, calcularTotales, formatearMoneda, formatearFecha, hoy
   };
 })();
@@ -2107,14 +2126,24 @@ const FIN_DEFAULTS = {
   metodos:    ['Efectivo','Debito','Credito','Transferencia / SPEI'],
   tiposInv:   ['Acciones / ETFs','Crypto','Ahorro / CETES','Negocio / Reinversion','Negocios Externos']
 };
+
+let _finVarsCache = null;
+
+async function loadFinVarsCache() {
+  const all = await DB.getVariables();
+  _finVarsCache = {
+    categorias: all.filter(v => v.grupo === 'categoria'),
+    metodos:    all.filter(v => v.grupo === 'metodoPago'),
+    tiposInv:   all.filter(v => v.grupo === 'tipoInversion')
+  };
+  return _finVarsCache;
+}
+
 function finVars(key) {
-  try { return JSON.parse(localStorage.getItem('finVars_'+key)) || FIN_DEFAULTS[key]; }
-  catch { return FIN_DEFAULTS[key]; }
+  if (_finVarsCache) return _finVarsCache[key].map(v => v.valor);
+  return FIN_DEFAULTS[key];
 }
-function saveFinVars(key, arr) {
-  localStorage.setItem('finVars_'+key, JSON.stringify(arr.filter(v=>v.trim())));
-}
-// Shortcut accessors (keep for backwards compat in renderInversiones etc.)
+
 const getFIN_CATEGORIAS = () => finVars('categorias');
 const getFIN_METODOS    = () => finVars('metodos');
 const getFIN_TIPOS_INV  = () => finVars('tiposInv');
@@ -2130,6 +2159,7 @@ function finTab(t) {
 async function loadFinanzas() {
   document.getElementById('fin-tbody').innerHTML = '<tr><td colspan="7" style="text-align:center;padding:var(--space-8)"><div class="spinner"></div></td></tr>';
   try {
+    if (!_finVarsCache) await loadFinVarsCache();
     const filtros = {};
     const tipo = document.getElementById('fin-filter-tipo')?.value;
     const mes  = document.getElementById('fin-filter-mes')?.value;
@@ -2397,75 +2427,68 @@ async function deleteFinanza(id) {
   catch(e) { toast('Error: '+e.message,'error'); }
 }
 
-function renderFinVariables() {
-  const groups = [
-    { key:'categorias', label:'Categorías de gasto/ingreso' },
-    { key:'metodos',    label:'Métodos de pago' },
-    { key:'tiposInv',   label:'Tipos de inversión' }
-  ];
-  document.getElementById('fin-variables-content').innerHTML = `
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:var(--card-gap)">
-      ${groups.map(g => `
-        <div class="card" style="padding:var(--space-5)">
-          <div style="font-family:var(--font-display);font-weight:700;font-size:var(--text-md);margin-bottom:var(--space-4)">${g.label}</div>
-          <div id="fin-var-list-${g.key}" style="display:flex;flex-direction:column;gap:var(--space-2);margin-bottom:var(--space-4)">
-            ${finVars(g.key).map((v,i) => `
-              <div style="display:flex;align-items:center;gap:var(--space-2)">
-                <input class="form-input" style="flex:1;font-size:var(--text-sm)" id="fin-var-${g.key}-${i}" value="${v}">
-                <button class="btn btn-sm" style="background:var(--danger-subtle,#fef2f2);color:var(--danger-text,#b91c1c);border:1px solid transparent;flex-shrink:0" onclick="removeFinVar('${g.key}',${i})">✕</button>
-              </div>
-            `).join('')}
+async function renderFinVariables() {
+  const el = document.getElementById('fin-variables-content');
+  el.innerHTML = '<div style="padding:var(--space-8);text-align:center"><div class="spinner"></div></div>';
+  try {
+    if (!_finVarsCache) await loadFinVarsCache();
+    const groups = [
+      { key:'categorias', grupo:'categoria',     label:'Categorías de gasto/ingreso' },
+      { key:'metodos',    grupo:'metodoPago',    label:'Métodos de pago' },
+      { key:'tiposInv',   grupo:'tipoInversion', label:'Tipos de inversión' }
+    ];
+    el.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:var(--card-gap)">
+        ${groups.map(g => `
+          <div class="card" style="padding:var(--space-5)">
+            <div style="font-family:var(--font-display);font-weight:700;font-size:var(--text-md);margin-bottom:var(--space-4)">${g.label}</div>
+            <div id="fin-var-list-${g.key}" style="display:flex;flex-direction:column;gap:var(--space-2);margin-bottom:var(--space-4)">
+              ${(_finVarsCache[g.key]||[]).map(v => `
+                <div style="display:flex;align-items:center;gap:var(--space-2)">
+                  <span style="flex:1;font-size:var(--text-sm);padding:6px 10px;background:var(--bg-elevated);border:1px solid var(--border-subtle);border-radius:var(--radius-sm)">${v.valor}</span>
+                  <button class="btn btn-sm" style="background:var(--danger-subtle,#fef2f2);color:var(--danger-text,#b91c1c);border:1px solid transparent;flex-shrink:0" onclick="deleteFinVar('${v.id}','${g.key}')">✕</button>
+                </div>
+              `).join('')}
+            </div>
+            <div style="display:flex;gap:var(--space-2)">
+              <input class="form-input" style="flex:1;font-size:var(--text-sm)" id="fin-var-new-${g.key}" placeholder="Nueva opción..." onkeydown="if(event.key==='Enter')addFinVarAirtable('${g.key}','${g.grupo}')">
+              <button class="btn btn-primary btn-sm" onclick="addFinVarAirtable('${g.key}','${g.grupo}')">+ Agregar</button>
+            </div>
           </div>
-          <div style="display:flex;gap:var(--space-2)">
-            <button class="btn btn-secondary btn-sm" style="flex:1" onclick="addFinVar('${g.key}')">+ Agregar</button>
-            <button class="btn btn-primary btn-sm" style="flex:1" onclick="saveFinVarGroup('${g.key}')">Guardar</button>
-          </div>
-        </div>
-      `).join('')}
-    </div>
-    <div style="margin-top:var(--space-6);padding:var(--space-4);background:var(--bg-elevated);border-radius:var(--radius-md);border:1px solid var(--border-subtle)">
-      <div style="font-size:var(--text-sm);color:var(--text-secondary)">
-        Los cambios se guardan en este navegador. Para restaurar los valores originales, haz clic en <strong>Restaurar predeterminados</strong>.
+        `).join('')}
       </div>
-      <button class="btn btn-secondary btn-sm" style="margin-top:var(--space-3)" onclick="resetFinVars()">Restaurar predeterminados</button>
-    </div>
-  `;
+      <div style="margin-top:var(--space-6);padding:var(--space-4);background:var(--bg-elevated);border-radius:var(--radius-md);border:1px solid var(--border-subtle)">
+        <div style="font-size:var(--text-sm);color:var(--text-secondary)">
+          Los cambios se guardan directamente en Airtable (tabla <strong>Variables</strong>).
+        </div>
+      </div>
+    `;
+  } catch(e) {
+    el.innerHTML = `<div style="color:var(--danger-text,#b91c1c);padding:var(--space-4)">Error cargando variables: ${e.message}</div>`;
+  }
 }
 
-function addFinVar(key) {
-  const list = document.getElementById(`fin-var-list-${key}`);
-  const idx = list.querySelectorAll('input').length;
-  const div = document.createElement('div');
-  div.style.cssText = 'display:flex;align-items:center;gap:var(--space-2)';
-  div.innerHTML = `
-    <input class="form-input" style="flex:1;font-size:var(--text-sm)" id="fin-var-${key}-${idx}" placeholder="Nueva opción..." autofocus>
-    <button class="btn btn-sm" style="background:var(--danger-subtle,#fef2f2);color:var(--danger-text,#b91c1c);border:1px solid transparent;flex-shrink:0" onclick="this.parentElement.remove()">✕</button>
-  `;
-  list.appendChild(div);
-  div.querySelector('input').focus();
+async function addFinVarAirtable(key, grupo) {
+  const input = document.getElementById(`fin-var-new-${key}`);
+  const valor = input.value.trim();
+  if (!valor) { toast('Escribe un nombre para la opción', 'warning'); input.focus(); return; }
+  try {
+    const v = await DB.crearVariable(grupo, valor);
+    _finVarsCache[key].push(v);
+    input.value = '';
+    renderFinVariables();
+    toast('Opción agregada', 'success');
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
 }
 
-function saveFinVarGroup(key) {
-  const list = document.getElementById(`fin-var-list-${key}`);
-  const vals = [...list.querySelectorAll('input')].map(i => i.value.trim()).filter(Boolean);
-  if (!vals.length) { toast('Debe haber al menos una opción', 'warning'); return; }
-  saveFinVars(key, vals);
-  toast('Variables guardadas', 'success');
-  renderFinVariables();
-}
-
-function removeFinVar(key, idx) {
-  const vals = finVars(key);
-  vals.splice(idx, 1);
-  saveFinVars(key, vals);
-  renderFinVariables();
-}
-
-function resetFinVars() {
-  if (!confirm('¿Restaurar todas las variables a sus valores predeterminados?')) return;
-  ['categorias','metodos','tiposInv'].forEach(k => localStorage.removeItem('finVars_'+k));
-  toast('Variables restauradas', 'success');
-  renderFinVariables();
+async function deleteFinVar(id, key) {
+  if (!confirm('¿Eliminar esta opción?')) return;
+  try {
+    await DB.eliminarVariable(id);
+    _finVarsCache[key] = _finVarsCache[key].filter(v => v.id !== id);
+    renderFinVariables();
+    toast('Opción eliminada', 'success');
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
 }
 
 /* ══════════════════════════════════
