@@ -200,6 +200,20 @@
 .auto-last { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); }
 .auto-footer { margin-top: auto; display: flex; align-items: center; justify-content: space-between; }
 
+/* ── Finanzas ── */
+.fin-tabs { display:flex; gap:0; margin-bottom:var(--space-6); border-bottom:1px solid var(--border-default); }
+.fin-tab { padding:var(--space-3) var(--space-5); font-size:var(--text-sm); font-weight:500; color:var(--text-secondary); cursor:pointer; border-bottom:2px solid transparent; transition:all .15s; }
+.fin-tab:hover { color:var(--text-primary); }
+.fin-tab.active { color:var(--accent-text); border-color:var(--accent); }
+.fin-tab-panel { display:none; }
+.fin-tab-panel.active { display:block; animation:fadeIn .2s ease; }
+.tipo-badge { display:inline-flex; align-items:center; padding:2px 8px; border-radius:var(--radius-full); font-size:10px; font-weight:600; font-family:var(--font-mono); text-transform:uppercase; letter-spacing:.04em; }
+.tipo-gasto { background:var(--danger-subtle,#fef2f2); color:var(--danger-text,#b91c1c); }
+.tipo-ingreso { background:var(--success-subtle,#f0fdf4); color:var(--success-text,#15803d); }
+.tipo-inversion { background:var(--info-subtle,#eff6ff); color:var(--info-text,#1d4ed8); }
+.inv-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:var(--card-gap); }
+.inv-rendimiento { font-family:var(--font-mono); font-size:var(--text-xl); font-weight:700; color:var(--success-text,#15803d); }
+
 /* ── Config ── */
 .config-section { margin-bottom: var(--space-8); }
 .config-section-title { font-family: var(--font-display); font-size: var(--text-lg); font-weight: 700; margin-bottom: var(--space-4); display: flex; align-items: center; gap: var(--space-3); }
@@ -297,6 +311,9 @@
       </div>
       <div class="nav-item" data-route="invoices" onclick="navigate('invoices')">
         <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1-2-1z"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="14" y2="13"/></svg></span> Invoices
+      </div>
+      <div class="nav-item" data-route="finanzas" onclick="navigate('finanzas')">
+        <span class="nav-icon"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/></svg></span> Finanzas
       </div>
       <div class="nav-section-label">Herramientas</div>
       <div class="nav-item" data-route="automatizaciones" onclick="navigate('automatizaciones')">
@@ -444,6 +461,83 @@
         <div id="inv-detail-view" style="display:none"></div>
       </div>
 
+      <!-- FINANZAS -->
+      <div id="view-finanzas" class="module-view">
+        <div class="page-header">
+          <h1>Finanzas</h1>
+          <p>Control de gastos, ingresos e inversiones</p>
+        </div>
+        <div class="kpi-grid" style="margin-bottom:var(--space-6)">
+          <div class="kpi-card kpi-accent">
+            <div class="kpi-label">Saldo del mes</div>
+            <div class="kpi-value" id="fin-saldo">—</div>
+            <div class="kpi-sub">Ingresos − Gastos</div>
+          </div>
+          <div class="kpi-card kpi-success">
+            <div class="kpi-label">Ingresos del mes</div>
+            <div class="kpi-value" id="fin-ingresos">—</div>
+          </div>
+          <div class="kpi-card kpi-warning">
+            <div class="kpi-label">Gastos del mes</div>
+            <div class="kpi-value" id="fin-gastos">—</div>
+          </div>
+          <div class="kpi-card kpi-info">
+            <div class="kpi-label">Valor inversiones</div>
+            <div class="kpi-value" id="fin-inversiones">—</div>
+            <div class="kpi-sub">Capital + rendimiento estimado</div>
+          </div>
+        </div>
+        <div class="fin-tabs">
+          <div class="fin-tab active" data-tab="movimientos" onclick="finTab('movimientos')">Movimientos</div>
+          <div class="fin-tab" data-tab="graficas" onclick="finTab('graficas');renderGraficasFinanzas()">Gráficas</div>
+          <div class="fin-tab" data-tab="inversiones" onclick="finTab('inversiones');renderInversiones()">Inversiones</div>
+        </div>
+        <!-- Tab Movimientos -->
+        <div class="fin-tab-panel active" data-panel="movimientos">
+          <div class="filters-bar">
+            <select class="form-input" id="fin-filter-tipo" style="width:auto" onchange="loadFinanzas()">
+              <option value="">Todos los tipos</option>
+              <option value="Gasto">Gastos</option>
+              <option value="Ingreso">Ingresos</option>
+              <option value="Inversion">Inversiones</option>
+            </select>
+            <input type="month" class="form-input" id="fin-filter-mes" style="width:auto" onchange="loadFinanzas()">
+            <button class="btn btn-secondary btn-sm" onclick="document.getElementById('fin-filter-tipo').value='';document.getElementById('fin-filter-mes').value='';loadFinanzas()">Limpiar filtros</button>
+          </div>
+          <div class="card" style="padding:0">
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Fecha</th><th>Descripción</th><th>Tipo</th><th>Monto</th><th>Categoría / Tipo inv.</th><th>Pago / Método</th><th></th></tr></thead>
+                <tbody id="fin-tbody"><tr><td colspan="7"><div class="loading-overlay"><div class="spinner"></div></div></td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <!-- Tab Gráficas -->
+        <div class="fin-tab-panel" data-panel="graficas">
+          <div class="dash-grid">
+            <div class="card dash-grid-wide">
+              <div class="card-header"><h3 class="card-title">Ingresos vs Gastos por mes</h3></div>
+              <div class="chart-container" style="height:260px"><canvas id="fin-chart-mensual"></canvas></div>
+            </div>
+            <div class="card">
+              <div class="card-header"><h3 class="card-title">Gastos por categoría</h3></div>
+              <div class="chart-container" style="height:260px"><canvas id="fin-chart-categorias"></canvas></div>
+            </div>
+            <div class="card" style="grid-column:1/-1">
+              <div class="card-header"><h3 class="card-title">Balance acumulado</h3></div>
+              <div class="chart-container" style="height:220px"><canvas id="fin-chart-balance"></canvas></div>
+            </div>
+          </div>
+        </div>
+        <!-- Tab Inversiones -->
+        <div class="fin-tab-panel" data-panel="inversiones">
+          <div class="inv-grid" id="fin-inv-grid">
+            <div style="color:var(--text-muted);font-size:var(--text-sm)">Cargando inversiones...</div>
+          </div>
+        </div>
+      </div>
+
       <!-- AUTOMATIZACIONES -->
       <div id="view-automatizaciones" class="module-view">
         <div class="page-header">
@@ -509,6 +603,16 @@
             <div class="form-group">
               <label class="form-label">Webhook: Generar propuesta IA</label>
               <input class="form-input" id="cfg-wh5" placeholder="/webhook/generar-propuesta">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Webhook: Telegram Finanzas</label>
+              <input class="form-input" id="cfg-wh6" placeholder="/webhook/telegram-finanzas">
+              <span class="token-hint">Webhook n8n que recibe mensajes de Telegram para registrar gastos/ingresos automáticamente</span>
+            </div>
+            <div class="form-group">
+              <label class="form-label">OpenAI API Key (Whisper)</label>
+              <input class="form-input" id="cfg-openai" type="password" placeholder="sk-...">
+              <span class="token-hint">Se usa en n8n para transcribir audios de voz enviados por Telegram. Obtén tu key en platform.openai.com</span>
             </div>
           </div>
         </div>
@@ -765,11 +869,44 @@ const DB = (() => {
     } catch { /* logs no críticos */ }
   }
 
+  // ── FINANZAS ──
+  async function getFinanzas(filtros = {}) {
+    const clauses = [];
+    if (filtros.tipo) clauses.push(`{Tipo}="${filtros.tipo}"`);
+    if (filtros.mes) {
+      const [y, m] = filtros.mes.split('-');
+      clauses.push(`AND(YEAR({Fecha})=${y},MONTH({Fecha})=${parseInt(m)})`);
+    }
+    const filter = clauses.length ? `filterByFormula=${encodeURIComponent('AND('+clauses.join(',')+')')}&` : '';
+    return (await fetchAll('Finanzas', `?${filter}sort[0][field]=Fecha&sort[0][direction]=desc`)).map(r => ({ id: r.id, ...r.fields }));
+  }
+
+  async function crearFinanza(data) {
+    const res = await fetch(`${baseUrl()}/Finanzas`, {
+      method: 'POST', headers: headers(),
+      body: JSON.stringify({ fields: data })
+    }).then(handleResponse);
+    return { id: res.id, ...res.fields };
+  }
+
+  async function actualizarFinanza(id, data) {
+    const res = await fetch(`${baseUrl()}/Finanzas/${id}`, {
+      method: 'PATCH', headers: headers(),
+      body: JSON.stringify({ fields: data })
+    }).then(handleResponse);
+    return { id: res.id, ...res.fields };
+  }
+
+  async function eliminarFinanza(id) {
+    await fetch(`${baseUrl()}/Finanzas/${id}`, { method: 'DELETE', headers: headers() }).then(handleResponse);
+  }
+
   return {
     getClientes, getClienteById, crearCliente, actualizarCliente, eliminarCliente, eliminarCotizacion,
     getCotizaciones, getCotizacionById, crearCotizacion, actualizarCotizacion,
     getInvoices, getInvoiceById, crearInvoice, eliminarInvoice, registrarPago, actualizarEstadoInvoice,
     getLogs, registrarLog,
+    getFinanzas, crearFinanza, actualizarFinanza, eliminarFinanza,
     parsearItems, calcularTotales, formatearMoneda, formatearFecha, hoy
   };
 })();
@@ -799,7 +936,9 @@ function loadConfig() {
     EMAIL:          c.email || '',
     LOGO:           c.logo  || '',
     ANTHROPIC_KEY:  c.anthropic || '',
-    WH_IA:          c.wh5   || ''
+    WH_IA:          c.wh5   || '',
+    WH_TELEGRAM:    c.wh6   || '',
+    OPENAI_KEY:     c.openai || ''
   };
   return !!c.token;
 }
@@ -817,7 +956,9 @@ function saveConfig() {
     email: document.getElementById('cfg-email').value.trim(),
     logo:  document.getElementById('cfg-logo').value.trim(),
     anthropic: document.getElementById('cfg-anthropic').value.trim(),
-    wh5:   document.getElementById('cfg-wh5').value.trim()
+    wh5:   document.getElementById('cfg-wh5').value.trim(),
+    wh6:   document.getElementById('cfg-wh6').value.trim(),
+    openai: document.getElementById('cfg-openai').value.trim()
   };
   localStorage.setItem('appConfig', JSON.stringify(cfg));
   loadConfig();
@@ -871,6 +1012,8 @@ function fillConfigForm() {
   document.getElementById('cfg-logo').value      = c.logo      || '';
   document.getElementById('cfg-anthropic').value = c.anthropic || '';
   document.getElementById('cfg-wh5').value        = c.wh5       || '';
+  document.getElementById('cfg-wh6').value        = c.wh6       || '';
+  document.getElementById('cfg-openai').value     = c.openai    || '';
 }
 
 /* ══════════════════════════════════
@@ -897,8 +1040,8 @@ function toggleTheme() {
 /* ══════════════════════════════════
    ROUTER
 ══════════════════════════════════ */
-const routeTitles = { dashboard:'Dashboard', clientes:'Clientes', cotizaciones:'Cotizaciones', invoices:'Invoices', automatizaciones:'Automatizaciones', config:'Configuración' };
-const routeActions = { clientes:'+ Nuevo cliente', cotizaciones:'+ Cotización', invoices:'+ Invoice' };
+const routeTitles = { dashboard:'Dashboard', clientes:'Clientes', cotizaciones:'Cotizaciones', invoices:'Invoices', finanzas:'Finanzas', automatizaciones:'Automatizaciones', config:'Configuración' };
+const routeActions = { clientes:'+ Nuevo cliente', cotizaciones:'+ Cotización', invoices:'+ Invoice', finanzas:'+ Movimiento' };
 
 function navigate(route) {
   document.querySelectorAll('.module-view').forEach(v => v.classList.remove('active'));
@@ -910,7 +1053,7 @@ function navigate(route) {
   if (routeActions[route]) {
     actionBtn.style.display = '';
     actionBtn.textContent = routeActions[route];
-    actionBtn.onclick = { clientes: showClienteForm, cotizaciones: showCotizacionForm, invoices: showInvoiceForm }[route];
+    actionBtn.onclick = { clientes: showClienteForm, cotizaciones: showCotizacionForm, invoices: showInvoiceForm, finanzas: showFinanzaForm }[route];
   } else {
     actionBtn.style.display = 'none';
   }
@@ -920,6 +1063,7 @@ function navigate(route) {
   if (route === 'clientes')        loadClientes();
   if (route === 'cotizaciones')    loadCotizaciones();
   if (route === 'invoices')        loadInvoices();
+  if (route === 'finanzas')        loadFinanzas();
   if (route === 'automatizaciones') loadAutomatizaciones();
   if (route === 'config')          fillConfigForm();
   window.location.hash = '/' + route;
@@ -1950,6 +2094,284 @@ async function triggerGenerarConIA() {
       btn.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"/><path d="M19 3v4"/><path d="M21 5h-4"/></svg> ✨ Regenerar';
     }
   }
+}
+
+/* ══════════════════════════════════
+   FINANZAS
+══════════════════════════════════ */
+const FIN_CATEGORIAS = ['Comida y restaurantes','Transporte','Entretenimiento','Clientes / Negocio','Servicios','Salud','Tecnologia','Viajes','Ropa','Otros'];
+const FIN_METODOS    = ['Efectivo','Debito','Credito','Transferencia / SPEI'];
+const FIN_TIPOS_INV  = ['Acciones / ETFs','Crypto','Ahorro / CETES','Negocio / Reinversion','Negocios Externos'];
+
+let finanzasData = [];
+const finanzasCharts = {};
+
+function finTab(t) {
+  document.querySelectorAll('.fin-tab').forEach(el => el.classList.toggle('active', el.dataset.tab === t));
+  document.querySelectorAll('.fin-tab-panel').forEach(el => el.classList.toggle('active', el.dataset.panel === t));
+}
+
+async function loadFinanzas() {
+  document.getElementById('fin-tbody').innerHTML = '<tr><td colspan="7" style="text-align:center;padding:var(--space-8)"><div class="spinner"></div></td></tr>';
+  try {
+    const filtros = {};
+    const tipo = document.getElementById('fin-filter-tipo')?.value;
+    const mes  = document.getElementById('fin-filter-mes')?.value;
+    if (tipo) filtros.tipo = tipo;
+    if (mes)  filtros.mes  = mes;
+    finanzasData = await DB.getFinanzas(filtros);
+    renderMovimientos(finanzasData);
+    renderResumenFinanzas(finanzasData);
+  } catch(e) { toast('Error cargando finanzas: ' + e.message, 'error'); }
+}
+
+function renderResumenFinanzas(data) {
+  const hoy = new Date();
+  const mes = data.filter(r => {
+    const f = new Date(r.Fecha + 'T12:00:00');
+    return f.getMonth() === hoy.getMonth() && f.getFullYear() === hoy.getFullYear();
+  });
+  const ingresos = mes.filter(r => r.Tipo==='Ingreso').reduce((s,r) => s+(r.Monto||0), 0);
+  const gastos   = mes.filter(r => r.Tipo==='Gasto').reduce((s,r) => s+(r.Monto||0), 0);
+  const saldo    = ingresos - gastos;
+  const valorInv = data.filter(r => r.Tipo==='Inversion').reduce((s,r) => {
+    const base = (r.MontoInicial||0) + (r.AportesExtra||0);
+    return s + base + base * (r.RendimientoPct||0) / 100;
+  }, 0);
+  const fmt = n => '$' + n.toLocaleString('es-MX', {minimumFractionDigits:2, maximumFractionDigits:2});
+  document.getElementById('fin-saldo').textContent      = fmt(saldo);
+  document.getElementById('fin-ingresos').textContent   = fmt(ingresos);
+  document.getElementById('fin-gastos').textContent     = fmt(gastos);
+  document.getElementById('fin-inversiones').textContent= fmt(valorInv);
+}
+
+function renderMovimientos(data) {
+  const tbody = document.getElementById('fin-tbody');
+  if (!data.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:var(--space-8)">Sin movimientos. Agrega uno con "+ Movimiento".</td></tr>';
+    return;
+  }
+  tbody.innerHTML = data.map(r => {
+    const signo = r.Tipo === 'Gasto' ? '-' : '+';
+    const color = r.Tipo === 'Gasto' ? 'var(--danger-text,#b91c1c)' : r.Tipo === 'Ingreso' ? 'var(--success-text,#15803d)' : 'var(--info-text,#1d4ed8)';
+    const extra = r.Tipo === 'Inversion' ? (r.TipoInversion||'—') : (r.MetodoPago||'—');
+    const cat   = r.Tipo === 'Inversion' ? '—' : (r.Categoria||'—');
+    return `<tr>
+      <td style="font-family:var(--font-mono);font-size:var(--text-xs)">${r.Fecha||'—'}</td>
+      <td>${r.Descripcion||'—'}</td>
+      <td><span class="tipo-badge tipo-${(r.Tipo||'').toLowerCase()}">${r.Tipo||'—'}</span></td>
+      <td style="font-family:var(--font-mono);font-weight:600;color:${color}">${signo}$${(r.Monto||0).toLocaleString('es-MX',{minimumFractionDigits:2})} <span style="font-size:10px;opacity:.6">${r.Moneda||'MXN'}</span></td>
+      <td style="font-size:var(--text-xs)">${cat}</td>
+      <td style="font-size:var(--text-xs)">${extra}</td>
+      <td><div style="display:flex;gap:4px">
+        <button class="btn btn-secondary btn-sm" onclick="showFinanzaForm('${r.id}')">Editar</button>
+        <button class="btn btn-sm" style="background:var(--danger-subtle,#fef2f2);color:var(--danger-text,#b91c1c);border:1px solid transparent" onclick="deleteFinanza('${r.id}')">Eliminar</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+
+async function renderGraficasFinanzas() {
+  try {
+    const all = finanzasData.length ? finanzasData : await DB.getFinanzas({});
+    const now = new Date();
+    const months = Array.from({length:6}, (_,i) => {
+      const d = new Date(now.getFullYear(), now.getMonth()-5+i, 1);
+      return { key:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`, label:d.toLocaleDateString('es-MX',{month:'short',year:'2-digit'}) };
+    });
+    const ing = months.map(m => all.filter(r => r.Tipo==='Ingreso' && (r.Fecha||'').startsWith(m.key)).reduce((s,r)=>s+(r.Monto||0),0));
+    const gst = months.map(m => all.filter(r => r.Tipo==='Gasto'   && (r.Fecha||'').startsWith(m.key)).reduce((s,r)=>s+(r.Monto||0),0));
+
+    if (finanzasCharts.mensual) finanzasCharts.mensual.destroy();
+    finanzasCharts.mensual = new Chart(document.getElementById('fin-chart-mensual'), {
+      type:'bar', data:{ labels:months.map(m=>m.label), datasets:[
+        {label:'Ingresos',data:ing,backgroundColor:'rgba(34,197,94,.7)',borderRadius:4},
+        {label:'Gastos',  data:gst,backgroundColor:'rgba(239,68,68,.7)', borderRadius:4}
+      ]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'}},scales:{y:{beginAtZero:true,ticks:{callback:v=>'$'+v.toLocaleString('es-MX')}}}}
+    });
+
+    const gastos = all.filter(r => r.Tipo==='Gasto');
+    const catMap = {};
+    gastos.forEach(r => { const c=r.Categoria||'Otros'; catMap[c]=(catMap[c]||0)+(r.Monto||0); });
+    const cLabels = Object.keys(catMap), cVals = cLabels.map(k=>catMap[k]);
+    const cColors = ['#f97316','#3b82f6','#a855f7','#14b8a6','#eab308','#ec4899','#06b6d4','#f59e0b','#e11d48','#6b7280'];
+    if (finanzasCharts.categorias) finanzasCharts.categorias.destroy();
+    finanzasCharts.categorias = new Chart(document.getElementById('fin-chart-categorias'), {
+      type:'doughnut', data:{labels:cLabels,datasets:[{data:cVals,backgroundColor:cColors.slice(0,cLabels.length)}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right'}}}
+    });
+
+    const sorted = [...all].filter(r=>r.Fecha&&(r.Tipo==='Ingreso'||r.Tipo==='Gasto')).sort((a,b)=>a.Fecha.localeCompare(b.Fecha));
+    let running=0;
+    const pts = sorted.map(r => { running+=r.Tipo==='Ingreso'?(r.Monto||0):-(r.Monto||0); return {x:r.Fecha,y:running}; });
+    if (finanzasCharts.balance) finanzasCharts.balance.destroy();
+    finanzasCharts.balance = new Chart(document.getElementById('fin-chart-balance'), {
+      type:'line', data:{labels:pts.map(p=>p.x),datasets:[{label:'Balance acumulado',data:pts.map(p=>p.y),borderColor:'#6366f1',backgroundColor:'rgba(99,102,241,.1)',fill:true,tension:.4,pointRadius:2}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>'$'+v.toLocaleString('es-MX')}}}}
+    });
+  } catch(e) { toast('Error generando gráficas: '+e.message,'error'); }
+}
+
+async function renderInversiones() {
+  const grid = document.getElementById('fin-inv-grid');
+  grid.innerHTML = '<div class="spinner"></div>';
+  try {
+    const data = await DB.getFinanzas({tipo:'Inversion'});
+    if (!data.length) {
+      grid.innerHTML = '<div style="color:var(--text-muted);font-size:var(--text-sm)">Sin inversiones registradas. Agrega una con "+ Movimiento" eligiendo tipo Inversión.</div>';
+      return;
+    }
+    const fmt = n => '$'+n.toLocaleString('es-MX',{minimumFractionDigits:2});
+    grid.innerHTML = data.map(r => {
+      const base       = (r.MontoInicial||0)+(r.AportesExtra||0);
+      const ganancia   = base*(r.RendimientoPct||0)/100;
+      const valorActual= base+ganancia;
+      return `<div class="card" style="padding:var(--space-6)">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:var(--space-4)">
+          <div>
+            <div style="font-family:var(--font-display);font-weight:700;font-size:var(--text-md)">${r.Descripcion||'Inversión'}</div>
+            <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:2px">${r.TipoInversion||'—'} · ${r.Fecha||'—'}</div>
+          </div>
+          <div style="text-align:right">
+            <div class="inv-rendimiento">+${(r.RendimientoPct||0).toFixed(2)}%</div>
+            <div style="font-size:var(--text-xs);color:var(--text-muted)">rendimiento</div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--space-3);margin-bottom:var(--space-4)">
+          <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Capital inicial</div><div style="font-family:var(--font-mono);font-size:var(--text-sm);font-weight:600">${fmt(r.MontoInicial||0)}</div></div>
+          <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Aportes extra</div><div style="font-family:var(--font-mono);font-size:var(--text-sm);font-weight:600">${fmt(r.AportesExtra||0)}</div></div>
+          <div><div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Valor actual</div><div style="font-family:var(--font-mono);font-size:var(--text-sm);font-weight:600;color:var(--success-text,#15803d)">${fmt(valorActual)}</div></div>
+        </div>
+        <div style="display:flex;gap:var(--space-2)">
+          <button class="btn btn-secondary btn-sm" onclick="showFinanzaForm('${r.id}')">Editar</button>
+          <button class="btn btn-sm" style="background:var(--danger-subtle,#fef2f2);color:var(--danger-text,#b91c1c);border:1px solid transparent" onclick="deleteFinanza('${r.id}')">Eliminar</button>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) { toast('Error: '+e.message,'error'); }
+}
+
+function showFinanzaForm(id = null) {
+  const rec  = id ? finanzasData.find(r => r.id === id) : null;
+  const tipo = rec?.Tipo || 'Gasto';
+  const isInv= tipo === 'Inversion';
+  const catOpts = FIN_CATEGORIAS.map(c => `<option value="${c}" ${rec?.Categoria===c?'selected':''}>${c}</option>`).join('');
+  const metOpts = FIN_METODOS.map(m    => `<option value="${m}" ${rec?.MetodoPago===m?'selected':''}>${m}</option>`).join('');
+  const invOpts = FIN_TIPOS_INV.map(t  => `<option value="${t}" ${rec?.TipoInversion===t?'selected':''}>${t}</option>`).join('');
+
+  openModal(rec ? 'Editar movimiento' : 'Nuevo movimiento', `
+    <div class="form-group">
+      <label class="form-label">Tipo *</label>
+      <select class="form-input" id="fin-tipo" onchange="toggleFinanzaFields()">
+        <option value="Gasto"    ${tipo==='Gasto'?'selected':''}>Gasto</option>
+        <option value="Ingreso"  ${tipo==='Ingreso'?'selected':''}>Ingreso</option>
+        <option value="Inversion"${tipo==='Inversion'?'selected':''}>Inversión</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Descripción *</label>
+      <input class="form-input" id="fin-desc" value="${rec?.Descripcion||''}" placeholder="Ej: Comida en restaurante">
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4)">
+      <div class="form-group">
+        <label class="form-label">Monto *</label>
+        <input class="form-input" id="fin-monto" type="number" step="0.01" min="0" value="${rec?.Monto||''}" placeholder="0.00">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Moneda</label>
+        <select class="form-input" id="fin-moneda">
+          <option value="MXN" ${(rec?.Moneda||'MXN')==='MXN'?'selected':''}>MXN</option>
+          <option value="USD" ${rec?.Moneda==='USD'?'selected':''}>USD</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Fecha *</label>
+      <input class="form-input" id="fin-fecha" type="date" value="${rec?.Fecha||new Date().toISOString().slice(0,10)}">
+    </div>
+    <div id="fin-fields-normal" style="${isInv?'display:none':''}">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4)">
+        <div class="form-group">
+          <label class="form-label">Categoría</label>
+          <select class="form-input" id="fin-cat">${catOpts}</select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Método de pago</label>
+          <select class="form-input" id="fin-metodo">${metOpts}</select>
+        </div>
+      </div>
+    </div>
+    <div id="fin-fields-inv" style="${!isInv?'display:none':''}">
+      <div class="form-group">
+        <label class="form-label">Tipo de inversión</label>
+        <select class="form-input" id="fin-tipo-inv">${invOpts}</select>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4)">
+        <div class="form-group">
+          <label class="form-label">Monto inicial</label>
+          <input class="form-input" id="fin-monto-inicial" type="number" step="0.01" min="0" value="${rec?.MontoInicial||''}" placeholder="0.00">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Aportes extra</label>
+          <input class="form-input" id="fin-aportes" type="number" step="0.01" min="0" value="${rec?.AportesExtra||''}" placeholder="0.00">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Rendimiento estimado (%)</label>
+        <input class="form-input" id="fin-rendimiento" type="number" step="0.01" value="${rec?.RendimientoPct||''}" placeholder="Ej: 12.5">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Notas</label>
+      <textarea class="form-input" id="fin-notas" rows="2" placeholder="Notas opcionales...">${rec?.Notas||''}</textarea>
+    </div>
+  `, `submitFinanza('${id||''}')`, 'Guardar');
+}
+
+function toggleFinanzaFields() {
+  const isInv = document.getElementById('fin-tipo').value === 'Inversion';
+  document.getElementById('fin-fields-normal').style.display = isInv ? 'none' : '';
+  document.getElementById('fin-fields-inv').style.display    = isInv ? '' : 'none';
+}
+
+async function submitFinanza(id) {
+  const tipo  = document.getElementById('fin-tipo').value;
+  const desc  = document.getElementById('fin-desc').value.trim();
+  const monto = parseFloat(document.getElementById('fin-monto').value);
+  const fecha = document.getElementById('fin-fecha').value;
+  if (!desc)        { toast('Escribe una descripción', 'warning'); return; }
+  if (!monto||monto<=0) { toast('El monto debe ser mayor a 0', 'warning'); return; }
+  if (!fecha)       { toast('Selecciona una fecha', 'warning'); return; }
+  const isInv = tipo === 'Inversion';
+  const data = {
+    Descripcion: desc, Tipo: tipo, Monto: monto,
+    Moneda: document.getElementById('fin-moneda').value,
+    Fecha:  fecha,
+    Notas:  document.getElementById('fin-notas').value,
+    Fuente: 'Manual'
+  };
+  if (!isInv) {
+    data.Categoria  = document.getElementById('fin-cat').value;
+    data.MetodoPago = document.getElementById('fin-metodo').value;
+  } else {
+    data.TipoInversion  = document.getElementById('fin-tipo-inv').value;
+    data.MontoInicial   = parseFloat(document.getElementById('fin-monto-inicial').value)||0;
+    data.AportesExtra   = parseFloat(document.getElementById('fin-aportes').value)||0;
+    data.RendimientoPct = parseFloat(document.getElementById('fin-rendimiento').value)||0;
+  }
+  try {
+    if (id) { await DB.actualizarFinanza(id, data); toast('Movimiento actualizado','success'); }
+    else    { await DB.crearFinanza(data);           toast('Movimiento registrado','success'); }
+    closeModal();
+    loadFinanzas();
+  } catch(e) { toast('Error al guardar: '+e.message,'error'); }
+}
+
+async function deleteFinanza(id) {
+  if (!confirm('¿Eliminar este movimiento?')) return;
+  try { await DB.eliminarFinanza(id); toast('Eliminado','success'); loadFinanzas(); }
+  catch(e) { toast('Error: '+e.message,'error'); }
 }
 
 /* ══════════════════════════════════

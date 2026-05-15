@@ -1,0 +1,213 @@
+{
+  "name": "06 — Telegram Finanzas",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": ["message"],
+        "additionalFields": {}
+      },
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "credentials": { "telegramApi": { "id": "1", "name": "Telegram Bot" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const msg = $input.first().json.message;\nconst chatId = msg.chat.id;\nconst isVoice = !!(msg.voice || msg.audio);\nconst fileId = isVoice ? (msg.voice?.file_id || msg.audio?.file_id) : null;\nconst text = msg.text || '';\nreturn [{ json: { chatId, isVoice, fileId, text, botToken: $env.TELEGRAM_BOT_TOKEN || '' } }];"
+      },
+      "name": "Code — Parse Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            { "value1": "={{ $json.isVoice }}", "value2": true }
+          ]
+        }
+      },
+      "name": "Switch — Audio o Texto",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.telegram.org/bot{{ $json.botToken }}/getFile?file_id={{ $json.fileId }}",
+        "options": {}
+      },
+      "name": "HTTP — Get File Path",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [900, 200]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.telegram.org/file/bot{{ $('Code — Parse Message').first().json.botToken }}/{{ $json.result.file_path }}",
+        "options": { "response": { "response": { "responseFormat": "file" } } }
+      },
+      "name": "HTTP — Download Audio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1120, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/audio/transcriptions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.OPENAI_API_KEY }}" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "model", "value": "whisper-1" },
+            { "name": "language", "value": "es" },
+            { "name": "file", "value": "={{ $binary.data }}", "parameterType": "formBinaryData" }
+          ]
+        }
+      },
+      "name": "HTTP — Whisper Transcribe",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1340, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge transcribed text (audio path) or direct text\nconst chatId = $('Code — Parse Message').first().json.chatId;\nconst transcribed = $input.first().json.text || '';\nconst rawText = transcribed;\nreturn [{ json: { chatId, rawText } }];"
+      },
+      "name": "Code — Merge Audio Text",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1560, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "const chatId = $('Code — Parse Message').first().json.chatId;\nconst rawText = $('Code — Parse Message').first().json.text;\nreturn [{ json: { chatId, rawText } }];"
+      },
+      "name": "Code — Pass Text",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key", "value": "={{ $env.ANTHROPIC_API_KEY }}" },
+            { "name": "anthropic-version", "value": "2023-06-01" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 400, messages: [{ role: 'user', content: `Extrae los datos financieros del siguiente mensaje y responde SOLO con JSON válido sin explicaciones adicionales.\n\nMensaje: \"${$json.rawText}\"\n\nResponde con este formato exacto:\n{\"tipo\": \"Gasto|Ingreso|Inversion\", \"descripcion\": \"descripción corta\", \"monto\": 0.00, \"moneda\": \"MXN|USD\", \"categoria\": \"Comida y restaurantes|Transporte|Entretenimiento|Clientes / Negocio|Servicios|Salud|Tecnologia|Viajes|Ropa|Otros\", \"metodoPago\": \"Efectivo|Debito|Credito|Transferencia / SPEI\", \"fecha\": \"YYYY-MM-DD\"}\n\nReglas:\n- fecha: usa la fecha de hoy si no se menciona (${new Date().toISOString().slice(0,10)})\n- moneda: MXN por defecto\n- metodoPago: Efectivo por defecto si no se menciona\n- Si es inversión omite metodoPago y categoria` }] }) }}"
+      },
+      "name": "HTTP — Claude Extract",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1780, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const chatId = $('Code — Merge Audio Text').first()?.json?.chatId || $('Code — Pass Text').first()?.json?.chatId;\nlet extracted;\ntry {\n  const raw = $input.first().json.content[0].text.trim();\n  const jsonMatch = raw.match(/\\{[\\s\\S]*\\}/);\n  extracted = JSON.parse(jsonMatch ? jsonMatch[0] : raw);\n} catch(e) {\n  return [{ json: { chatId, error: 'No pude entender el mensaje. Intenta de nuevo con el formato: \"Gasté $150 en comida con débito\"' } }];\n}\nreturn [{ json: { chatId, extracted, ok: true } }];"
+      },
+      "name": "Code — Parse Claude Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2000, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            { "value1": "={{ $json.ok }}", "value2": true }
+          ]
+        }
+      },
+      "name": "Switch — Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [2220, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.airtable.com/v0/{{ $env.AIRTABLE_BASE_ID }}/Finanzas",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.AIRTABLE_TOKEN }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ fields: { Descripcion: $json.extracted.descripcion, Tipo: $json.extracted.tipo, Monto: $json.extracted.monto, Moneda: $json.extracted.moneda || 'MXN', Fecha: $json.extracted.fecha, Categoria: $json.extracted.categoria, MetodoPago: $json.extracted.metodoPago, Fuente: 'Telegram' } }) }}"
+      },
+      "name": "HTTP — Create Airtable Record",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [2440, 200]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Code — Parse Claude Response').first().json.chatId }}",
+        "text": "=✅ *{{ $('Code — Parse Claude Response').first().json.extracted.tipo }}* registrado\\n\\n📝 {{ $('Code — Parse Claude Response').first().json.extracted.descripcion }}\\n💰 ${{ $('Code — Parse Claude Response').first().json.extracted.monto }} {{ $('Code — Parse Claude Response').first().json.extracted.moneda || 'MXN' }}\\n📅 {{ $('Code — Parse Claude Response').first().json.extracted.fecha }}\\n🏷️ {{ $('Code — Parse Claude Response').first().json.extracted.categoria || '' }}",
+        "additionalFields": { "parse_mode": "Markdown" }
+      },
+      "name": "Telegram — Confirm OK",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [2660, 200],
+      "credentials": { "telegramApi": { "id": "1", "name": "Telegram Bot" } }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "=❌ {{ $json.error }}",
+        "additionalFields": {}
+      },
+      "name": "Telegram — Send Error",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [2440, 400],
+      "credentials": { "telegramApi": { "id": "1", "name": "Telegram Bot" } }
+    }
+  ],
+  "connections": {
+    "Telegram Trigger":          { "main": [[{ "node": "Code — Parse Message",     "type": "main", "index": 0 }]] },
+    "Code — Parse Message":      { "main": [[{ "node": "Switch — Audio o Texto",   "type": "main", "index": 0 }]] },
+    "Switch — Audio o Texto":    {
+      "main": [
+        [{ "node": "HTTP — Get File Path",    "type": "main", "index": 0 }],
+        [{ "node": "Code — Pass Text",        "type": "main", "index": 0 }]
+      ]
+    },
+    "HTTP — Get File Path":      { "main": [[{ "node": "HTTP — Download Audio",    "type": "main", "index": 0 }]] },
+    "HTTP — Download Audio":     { "main": [[{ "node": "HTTP — Whisper Transcribe","type": "main", "index": 0 }]] },
+    "HTTP — Whisper Transcribe": { "main": [[{ "node": "Code — Merge Audio Text",  "type": "main", "index": 0 }]] },
+    "Code — Merge Audio Text":   { "main": [[{ "node": "HTTP — Claude Extract",    "type": "main", "index": 0 }]] },
+    "Code — Pass Text":          { "main": [[{ "node": "HTTP — Claude Extract",    "type": "main", "index": 0 }]] },
+    "HTTP — Claude Extract":     { "main": [[{ "node": "Code — Parse Claude Response","type": "main", "index": 0 }]] },
+    "Code — Parse Claude Response":{ "main": [[{ "node": "Switch — Valid?",        "type": "main", "index": 0 }]] },
+    "Switch — Valid?": {
+      "main": [
+        [{ "node": "HTTP — Create Airtable Record", "type": "main", "index": 0 }],
+        [{ "node": "Telegram — Send Error",         "type": "main", "index": 0 }]
+      ]
+    },
+    "HTTP — Create Airtable Record": { "main": [[{ "node": "Telegram — Confirm OK","type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}
