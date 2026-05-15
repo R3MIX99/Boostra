@@ -1736,7 +1736,12 @@ function showInvoiceForm(invId) {
           <tbody id="inv-items-tbody"></tbody></table>
           <div class="add-item-row"><button type="button" class="btn btn-secondary btn-sm" onclick="addInvItem()">+ Agregar ítem</button></div>
         </div>
-        <div class="totals-box" id="inv-totals" style="margin-top:var(--space-4)"></div>
+        <div style="display:flex;align-items:center;gap:var(--space-2);margin-top:var(--space-3)">
+          <label style="display:flex;align-items:center;gap:var(--space-2);cursor:pointer;font-size:var(--text-sm)">
+            <input type="checkbox" id="inv-iva" ${inv?.IVA>0||inv===null?'checked':''} onchange="updateInvTotales()"> Aplicar IVA (16%)
+          </label>
+        </div>
+        <div class="totals-box" id="inv-totals" style="margin-top:var(--space-3)"></div>
         <div class="form-group" style="margin-top:var(--space-4)"><label class="form-label">Notas internas</label><textarea class="form-textarea" id="inv-notas">${inv?.NotasInternas||''}</textarea></div>
         <div style="display:flex;gap:var(--space-3);margin-top:var(--space-6)">
           <button type="button" class="btn btn-secondary" onclick="showInvView('list');loadInvoices()">Cancelar</button>
@@ -1766,20 +1771,26 @@ function renderInvItems() {
     </tr>`).join('');
 }
 function updateInvTotales() {
-  const t = DB.calcularTotales(invItems,0,false);
+  const iva = document.getElementById('inv-iva')?.checked ?? true;
+  const t = DB.calcularTotales(invItems, 0, iva);
   const el = document.getElementById('inv-totals');
   if (!el) return;
-  el.innerHTML = `<div class="totals-row total-final"><span>Total</span><span class="num">${DB.formatearMoneda(t.subtotal)}</span></div>`;
+  el.innerHTML = `
+    <div class="totals-row"><span>Subtotal</span><span class="num">${DB.formatearMoneda(t.subtotal)}</span></div>
+    ${iva ? `<div class="totals-row"><span>IVA (16%)</span><span class="num">${DB.formatearMoneda(t.iva)}</span></div>` : ''}
+    <div class="totals-row total-final"><span>Total</span><span class="num">${DB.formatearMoneda(t.total)}</span></div>
+  `;
 }
 
 async function submitInvoice(e, invId) {
   e.preventDefault();
   const clienteId = document.getElementById('inv-cliente').value;
   if (!clienteId) { toast('Selecciona un cliente','warning'); return; }
-  const total = invItems.reduce((s,it)=>s+it.cantidad*it.precioUnitario,0);
+  const iva = document.getElementById('inv-iva').checked;
+  const t = DB.calcularTotales(invItems, 0, iva);
   const data = {
     ClienteID: [clienteId],
-    Items: JSON.stringify(invItems), Total: total,
+    Items: JSON.stringify(invItems), Total: t.total,
     EsquemaPago: document.getElementById('inv-esquema').value,
     FechaVencimiento: document.getElementById('inv-vencimiento').value || null,
     NotasInternas: document.getElementById('inv-notas').value
