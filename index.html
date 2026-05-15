@@ -491,6 +491,7 @@
           <div class="fin-tab active" data-tab="movimientos" onclick="finTab('movimientos')">Movimientos</div>
           <div class="fin-tab" data-tab="graficas" onclick="finTab('graficas');renderGraficasFinanzas()">Gráficas</div>
           <div class="fin-tab" data-tab="inversiones" onclick="finTab('inversiones');renderInversiones()">Inversiones</div>
+          <div class="fin-tab" data-tab="variables" onclick="finTab('variables');renderFinVariables()">Variables</div>
         </div>
         <!-- Tab Movimientos -->
         <div class="fin-tab-panel active" data-panel="movimientos">
@@ -535,6 +536,10 @@
           <div class="inv-grid" id="fin-inv-grid">
             <div style="color:var(--text-muted);font-size:var(--text-sm)">Cargando inversiones...</div>
           </div>
+        </div>
+        <!-- Tab Variables -->
+        <div class="fin-tab-panel" data-panel="variables">
+          <div id="fin-variables-content"></div>
         </div>
       </div>
 
@@ -2099,9 +2104,22 @@ async function triggerGenerarConIA() {
 /* ══════════════════════════════════
    FINANZAS
 ══════════════════════════════════ */
-const FIN_CATEGORIAS = ['Comida y restaurantes','Transporte','Entretenimiento','Clientes / Negocio','Servicios','Salud','Tecnologia','Viajes','Ropa','Otros'];
-const FIN_METODOS    = ['Efectivo','Debito','Credito','Transferencia / SPEI'];
-const FIN_TIPOS_INV  = ['Acciones / ETFs','Crypto','Ahorro / CETES','Negocio / Reinversion','Negocios Externos'];
+const FIN_DEFAULTS = {
+  categorias: ['Comida y restaurantes','Transporte','Entretenimiento','Clientes / Negocio','Servicios','Salud','Tecnologia','Viajes','Ropa','Otros'],
+  metodos:    ['Efectivo','Debito','Credito','Transferencia / SPEI'],
+  tiposInv:   ['Acciones / ETFs','Crypto','Ahorro / CETES','Negocio / Reinversion','Negocios Externos']
+};
+function finVars(key) {
+  try { return JSON.parse(localStorage.getItem('finVars_'+key)) || FIN_DEFAULTS[key]; }
+  catch { return FIN_DEFAULTS[key]; }
+}
+function saveFinVars(key, arr) {
+  localStorage.setItem('finVars_'+key, JSON.stringify(arr.filter(v=>v.trim())));
+}
+// Shortcut accessors (keep for backwards compat in renderInversiones etc.)
+const getFIN_CATEGORIAS = () => finVars('categorias');
+const getFIN_METODOS    = () => finVars('metodos');
+const getFIN_TIPOS_INV  = () => finVars('tiposInv');
 
 let finanzasData = [];
 const finanzasCharts = {};
@@ -2256,9 +2274,9 @@ function showFinanzaForm(id = null) {
   const rec  = id ? finanzasData.find(r => r.id === id) : null;
   const tipo = rec?.Tipo || 'Gasto';
   const isInv= tipo === 'Inversion';
-  const catOpts = FIN_CATEGORIAS.map(c => `<option value="${c}" ${rec?.Categoria===c?'selected':''}>${c}</option>`).join('');
-  const metOpts = FIN_METODOS.map(m    => `<option value="${m}" ${rec?.MetodoPago===m?'selected':''}>${m}</option>`).join('');
-  const invOpts = FIN_TIPOS_INV.map(t  => `<option value="${t}" ${rec?.TipoInversion===t?'selected':''}>${t}</option>`).join('');
+  const catOpts = getFIN_CATEGORIAS().map(c => `<option value="${c}" ${rec?.Categoria===c?'selected':''}>${c}</option>`).join('');
+  const metOpts = getFIN_METODOS().map(m    => `<option value="${m}" ${rec?.MetodoPago===m?'selected':''}>${m}</option>`).join('');
+  const invOpts = getFIN_TIPOS_INV().map(t  => `<option value="${t}" ${rec?.TipoInversion===t?'selected':''}>${t}</option>`).join('');
 
   openModal(rec ? 'Editar movimiento' : 'Nuevo movimiento', `
     <div class="form-group">
@@ -2326,7 +2344,11 @@ function showFinanzaForm(id = null) {
       <label class="form-label">Notas</label>
       <textarea class="form-input" id="fin-notas" rows="2" placeholder="Notas opcionales...">${rec?.Notas||''}</textarea>
     </div>
-  `, `submitFinanza('${id||''}')`, 'Guardar');
+    <div class="modal-footer" style="padding:0;border:none;margin-top:var(--space-4)">
+      <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button type="button" class="btn btn-primary" onclick="submitFinanza('${id||''}')">Guardar</button>
+    </div>
+  `);
 }
 
 function toggleFinanzaFields() {
@@ -2372,6 +2394,77 @@ async function deleteFinanza(id) {
   if (!confirm('¿Eliminar este movimiento?')) return;
   try { await DB.eliminarFinanza(id); toast('Eliminado','success'); loadFinanzas(); }
   catch(e) { toast('Error: '+e.message,'error'); }
+}
+
+function renderFinVariables() {
+  const groups = [
+    { key:'categorias', label:'Categorías de gasto/ingreso' },
+    { key:'metodos',    label:'Métodos de pago' },
+    { key:'tiposInv',   label:'Tipos de inversión' }
+  ];
+  document.getElementById('fin-variables-content').innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:var(--card-gap)">
+      ${groups.map(g => `
+        <div class="card" style="padding:var(--space-5)">
+          <div style="font-family:var(--font-display);font-weight:700;font-size:var(--text-md);margin-bottom:var(--space-4)">${g.label}</div>
+          <div id="fin-var-list-${g.key}" style="display:flex;flex-direction:column;gap:var(--space-2);margin-bottom:var(--space-4)">
+            ${finVars(g.key).map((v,i) => `
+              <div style="display:flex;align-items:center;gap:var(--space-2)">
+                <input class="form-input" style="flex:1;font-size:var(--text-sm)" id="fin-var-${g.key}-${i}" value="${v}">
+                <button class="btn btn-sm" style="background:var(--danger-subtle,#fef2f2);color:var(--danger-text,#b91c1c);border:1px solid transparent;flex-shrink:0" onclick="removeFinVar('${g.key}',${i})">✕</button>
+              </div>
+            `).join('')}
+          </div>
+          <div style="display:flex;gap:var(--space-2)">
+            <button class="btn btn-secondary btn-sm" style="flex:1" onclick="addFinVar('${g.key}')">+ Agregar</button>
+            <button class="btn btn-primary btn-sm" style="flex:1" onclick="saveFinVarGroup('${g.key}')">Guardar</button>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+    <div style="margin-top:var(--space-6);padding:var(--space-4);background:var(--bg-elevated);border-radius:var(--radius-md);border:1px solid var(--border-subtle)">
+      <div style="font-size:var(--text-sm);color:var(--text-secondary)">
+        Los cambios se guardan en este navegador. Para restaurar los valores originales, haz clic en <strong>Restaurar predeterminados</strong>.
+      </div>
+      <button class="btn btn-secondary btn-sm" style="margin-top:var(--space-3)" onclick="resetFinVars()">Restaurar predeterminados</button>
+    </div>
+  `;
+}
+
+function addFinVar(key) {
+  const list = document.getElementById(`fin-var-list-${key}`);
+  const idx = list.querySelectorAll('input').length;
+  const div = document.createElement('div');
+  div.style.cssText = 'display:flex;align-items:center;gap:var(--space-2)';
+  div.innerHTML = `
+    <input class="form-input" style="flex:1;font-size:var(--text-sm)" id="fin-var-${key}-${idx}" placeholder="Nueva opción..." autofocus>
+    <button class="btn btn-sm" style="background:var(--danger-subtle,#fef2f2);color:var(--danger-text,#b91c1c);border:1px solid transparent;flex-shrink:0" onclick="this.parentElement.remove()">✕</button>
+  `;
+  list.appendChild(div);
+  div.querySelector('input').focus();
+}
+
+function saveFinVarGroup(key) {
+  const list = document.getElementById(`fin-var-list-${key}`);
+  const vals = [...list.querySelectorAll('input')].map(i => i.value.trim()).filter(Boolean);
+  if (!vals.length) { toast('Debe haber al menos una opción', 'warning'); return; }
+  saveFinVars(key, vals);
+  toast('Variables guardadas', 'success');
+  renderFinVariables();
+}
+
+function removeFinVar(key, idx) {
+  const vals = finVars(key);
+  vals.splice(idx, 1);
+  saveFinVars(key, vals);
+  renderFinVariables();
+}
+
+function resetFinVars() {
+  if (!confirm('¿Restaurar todas las variables a sus valores predeterminados?')) return;
+  ['categorias','metodos','tiposInv'].forEach(k => localStorage.removeItem('finVars_'+k));
+  toast('Variables restauradas', 'success');
+  renderFinVariables();
 }
 
 /* ══════════════════════════════════
