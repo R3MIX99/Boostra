@@ -1160,7 +1160,7 @@ function getClienteNombre(id) {
   if (!id) return '—';
   const ids = Array.isArray(id) ? id : [id];
   const c = (AppState.clientes||[]).find(c => ids.includes(c.id));
-  return c ? c.Nombre : ids[0]?.slice(0,8)+'…';
+  return c ? (c.Empresa || c.Nombre) : ids[0]?.slice(0,8)+'…';
 }
 
 /* ══════════════════════════════════
