@@ -719,6 +719,14 @@ const DB = (() => {
     return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n || 0);
   }
 
+  function fmtCurrency(n, moneda) {
+    const m = moneda || 'MXN';
+    if (m === 'Crypto') return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 }).format(n || 0) + ' ₿';
+    const locales = { MXN: 'es-MX', USD: 'en-US', EUR: 'de-DE' };
+    try { return new Intl.NumberFormat(locales[m] || 'es-MX', { style: 'currency', currency: m }).format(n || 0); }
+    catch { return (n || 0).toFixed(2) + ' ' + m; }
+  }
+
   function formatearFecha(iso) {
     if (!iso) return '—';
     const d = iso.includes('T') ? new Date(iso) : new Date(iso + 'T12:00:00');
@@ -933,7 +941,7 @@ const DB = (() => {
     getLogs, registrarLog,
     getFinanzas, crearFinanza, actualizarFinanza, eliminarFinanza,
     getVariables, crearVariable, eliminarVariable,
-    parsearItems, calcularTotales, formatearMoneda, formatearFecha, hoy
+    parsearItems, calcularTotales, formatearMoneda, fmtCurrency, formatearFecha, hoy
   };
 })();
 </script>
@@ -1473,7 +1481,7 @@ function renderCotizacionesTable(cots) {
     <tr>
       <td class="num" style="font-weight:500">${c.NumeroCot||'—'}</td>
       <td>${getClienteNombre(c.ClienteID)}</td>
-      <td class="num">${DB.formatearMoneda(c.Total)}</td>
+      <td class="num">${DB.fmtCurrency(c.Total, c.Moneda)}</td>
       <td>${badgeEstadoCot(c.Estado)}</td>
       <td class="num">${DB.formatearFecha(c.FechaVencimiento)}</td>
       <td style="white-space:nowrap;display:flex;gap:4px;align-items:center">
@@ -1547,6 +1555,10 @@ function showCotizacionForm(cotId) {
           <div class="add-item-row"><button type="button" class="btn btn-secondary btn-sm" onclick="addCotItem()">+ Agregar ítem</button></div>
         </div>
         <div class="form-row" style="margin-top:var(--space-4);margin-bottom:var(--space-4)">
+          <div class="form-group"><label class="form-label">Moneda</label>
+            <select class="form-select" id="cot-moneda" onchange="updateCotTotales()">
+              ${['MXN','USD','EUR','Crypto'].map(m=>`<option value="${m}" ${(c?.Moneda||'MXN')===m?'selected':''}>${m}</option>`).join('')}
+            </select></div>
           <div class="form-group"><label class="form-label">Descuento (%)</label><input class="form-input" type="number" id="cot-descuento" min="0" max="100" value="${c?.Descuento||0}" oninput="updateCotTotales()"></div>
           <div class="form-group" style="align-self:flex-end"><label style="display:flex;align-items:center;gap:var(--space-2);cursor:pointer"><input type="checkbox" id="cot-iva" ${c?.IVA>0||c===null?'checked':''} onchange="updateCotTotales()"> Aplicar IVA (16%)</label></div>
         </div>
@@ -1570,7 +1582,7 @@ function removeCotItem(i) { cotItems.splice(i,1); if(!cotItems.length) addCotIte
 function updateCotItem(i,field,val) {
   cotItems[i][field]=field==='descripcion'?val:parseFloat(val)||0;
   const subEl = document.getElementById('cot-sub-'+i);
-  if (subEl) subEl.textContent = DB.formatearMoneda(cotItems[i].cantidad * cotItems[i].precioUnitario);
+  if (subEl) subEl.textContent = DB.fmtCurrency(cotItems[i].cantidad * cotItems[i].precioUnitario, document.getElementById('cot-moneda')?.value);
   updateCotTotales();
 }
 
@@ -1580,22 +1592,23 @@ function renderCotItems() {
       <td><input class="form-input" value="${it.descripcion}" placeholder="Descripción del servicio" oninput="updateCotItem(${i},'descripcion',this.value)" style="min-width:180px"></td>
       <td><input class="form-input" type="number" value="${it.cantidad}" min="0" step="0.01" oninput="updateCotItem(${i},'cantidad',this.value)" style="width:80px"></td>
       <td><input class="form-input" type="number" value="${it.precioUnitario}" min="0" step="0.01" oninput="updateCotItem(${i},'precioUnitario',this.value)" style="width:130px"></td>
-      <td class="num" id="cot-sub-${i}">${DB.formatearMoneda(it.cantidad*it.precioUnitario)}</td>
+      <td class="num" id="cot-sub-${i}">${DB.fmtCurrency(it.cantidad*it.precioUnitario, document.getElementById('cot-moneda')?.value)}</td>
       <td><button type="button" class="btn btn-ghost btn-sm" onclick="removeCotItem(${i})">✕</button></td>
     </tr>`).join('');
 }
 
 function updateCotTotales() {
-  const desc = parseFloat(document.getElementById('cot-descuento')?.value)||0;
-  const iva  = document.getElementById('cot-iva')?.checked ?? true;
+  const desc   = parseFloat(document.getElementById('cot-descuento')?.value)||0;
+  const iva    = document.getElementById('cot-iva')?.checked ?? true;
+  const moneda = document.getElementById('cot-moneda')?.value || 'MXN';
   const t = DB.calcularTotales(cotItems, desc, iva);
   const el = document.getElementById('cot-totals');
   if (!el) return;
   el.innerHTML = `
-    <div class="totals-row"><span>Subtotal</span><span class="num">${DB.formatearMoneda(t.subtotal)}</span></div>
-    ${t.descuentoMonto?`<div class="totals-row" style="color:var(--danger-text)"><span>Descuento (${desc}%)</span><span class="num">-${DB.formatearMoneda(t.descuentoMonto)}</span></div>`:''}
-    ${iva?`<div class="totals-row"><span>IVA (16%)</span><span class="num">${DB.formatearMoneda(t.iva)}</span></div>`:''}
-    <div class="totals-row total-final"><span>Total</span><span>${DB.formatearMoneda(t.total)}</span></div>`;
+    <div class="totals-row"><span>Subtotal</span><span class="num">${DB.fmtCurrency(t.subtotal, moneda)}</span></div>
+    ${t.descuentoMonto?`<div class="totals-row" style="color:var(--danger-text)"><span>Descuento (${desc}%)</span><span class="num">-${DB.fmtCurrency(t.descuentoMonto, moneda)}</span></div>`:''}
+    ${iva?`<div class="totals-row"><span>IVA (16%)</span><span class="num">${DB.fmtCurrency(t.iva, moneda)}</span></div>`:''}
+    <div class="totals-row total-final"><span>Total</span><span>${DB.fmtCurrency(t.total, moneda)}</span></div>`;
 }
 
 async function submitCotizacion(e, cotId) {
@@ -1610,6 +1623,7 @@ async function submitCotizacion(e, cotId) {
     Items: JSON.stringify(cotItems),
     Subtotal: t.subtotal, Descuento: desc, DescuentoMonto: t.descuentoMonto,
     IVA: t.iva, Total: t.total,
+    Moneda: document.getElementById('cot-moneda').value,
     Estado: document.getElementById('cot-estado').value,
     FechaVencimiento: document.getElementById('cot-vencimiento').value || null,
     NotasInternas: JSON.stringify({
@@ -1689,7 +1703,7 @@ function renderInvoicesTable(invs) {
     return `<tr>
       <td class="num" style="font-weight:500">${inv.NumeroInv||'—'}</td>
       <td>${getClienteNombre(inv.ClienteID)}</td>
-      <td class="num">${DB.formatearMoneda(inv.Total)}</td>
+      <td class="num">${DB.fmtCurrency(inv.Total, inv.Moneda)}</td>
       <td><div style="display:flex;align-items:center;gap:var(--space-2)"><div class="progress-bar" style="flex:1;min-width:60px"><div class="progress-fill ${pct>=100?'fill-success':pct>0?'':'fill-warning'}" style="width:${pct}%"></div></div><span class="num" style="font-size:var(--text-xs)">${pct}%</span></div></td>
       <td>${badgeEstadoInv(inv.Estado)}</td>
       <td class="num">${alerta}${DB.formatearFecha(inv.FechaVencimiento)}</td>
@@ -1736,10 +1750,14 @@ function showInvoiceForm(invId) {
           <tbody id="inv-items-tbody"></tbody></table>
           <div class="add-item-row"><button type="button" class="btn btn-secondary btn-sm" onclick="addInvItem()">+ Agregar ítem</button></div>
         </div>
-        <div style="display:flex;align-items:center;gap:var(--space-2);margin-top:var(--space-3)">
-          <label style="display:flex;align-items:center;gap:var(--space-2);cursor:pointer;font-size:var(--text-sm)">
+        <div class="form-row" style="margin-top:var(--space-4)">
+          <div class="form-group"><label class="form-label">Moneda</label>
+            <select class="form-select" id="inv-moneda" onchange="updateInvTotales()">
+              ${['MXN','USD','EUR','Crypto'].map(m=>`<option value="${m}" ${(inv?.Moneda||'MXN')===m?'selected':''}>${m}</option>`).join('')}
+            </select></div>
+          <div class="form-group" style="align-self:flex-end"><label style="display:flex;align-items:center;gap:var(--space-2);cursor:pointer;font-size:var(--text-sm)">
             <input type="checkbox" id="inv-iva" ${inv?.IVA>0||inv===null?'checked':''} onchange="updateInvTotales()"> Aplicar IVA (16%)
-          </label>
+          </label></div>
         </div>
         <div class="totals-box" id="inv-totals" style="margin-top:var(--space-3)"></div>
         <div class="form-group" style="margin-top:var(--space-4)"><label class="form-label">Notas internas</label><textarea class="form-textarea" id="inv-notas">${inv?.NotasInternas||''}</textarea></div>
@@ -1757,7 +1775,7 @@ function removeInvItem(i) { invItems.splice(i,1); if(!invItems.length) addInvIte
 function updateInvItem(i,field,val) {
   invItems[i][field]=field==='descripcion'?val:parseFloat(val)||0;
   const subEl = document.getElementById('inv-sub-'+i);
-  if (subEl) subEl.textContent = DB.formatearMoneda(invItems[i].cantidad * invItems[i].precioUnitario);
+  if (subEl) subEl.textContent = DB.fmtCurrency(invItems[i].cantidad * invItems[i].precioUnitario, document.getElementById('inv-moneda')?.value);
   updateInvTotales();
 }
 function renderInvItems() {
@@ -1766,19 +1784,20 @@ function renderInvItems() {
       <td><input class="form-input" value="${it.descripcion}" placeholder="Descripción" oninput="updateInvItem(${i},'descripcion',this.value)" style="min-width:180px"></td>
       <td><input class="form-input" type="number" value="${it.cantidad}" min="0" step="0.01" oninput="updateInvItem(${i},'cantidad',this.value)" style="width:80px"></td>
       <td><input class="form-input" type="number" value="${it.precioUnitario}" min="0" step="0.01" oninput="updateInvItem(${i},'precioUnitario',this.value)" style="width:130px"></td>
-      <td class="num" id="inv-sub-${i}">${DB.formatearMoneda(it.cantidad*it.precioUnitario)}</td>
+      <td class="num" id="inv-sub-${i}">${DB.fmtCurrency(it.cantidad*it.precioUnitario, document.getElementById('inv-moneda')?.value)}</td>
       <td><button type="button" class="btn btn-ghost btn-sm" onclick="removeInvItem(${i})">✕</button></td>
     </tr>`).join('');
 }
 function updateInvTotales() {
-  const iva = document.getElementById('inv-iva')?.checked ?? true;
+  const iva    = document.getElementById('inv-iva')?.checked ?? true;
+  const moneda = document.getElementById('inv-moneda')?.value || 'MXN';
   const t = DB.calcularTotales(invItems, 0, iva);
   const el = document.getElementById('inv-totals');
   if (!el) return;
   el.innerHTML = `
-    <div class="totals-row"><span>Subtotal</span><span class="num">${DB.formatearMoneda(t.subtotal)}</span></div>
-    ${iva ? `<div class="totals-row"><span>IVA (16%)</span><span class="num">${DB.formatearMoneda(t.iva)}</span></div>` : ''}
-    <div class="totals-row total-final"><span>Total</span><span class="num">${DB.formatearMoneda(t.total)}</span></div>
+    <div class="totals-row"><span>Subtotal</span><span class="num">${DB.fmtCurrency(t.subtotal, moneda)}</span></div>
+    ${iva ? `<div class="totals-row"><span>IVA (16%)</span><span class="num">${DB.fmtCurrency(t.iva, moneda)}</span></div>` : ''}
+    <div class="totals-row total-final"><span>Total</span><span class="num">${DB.fmtCurrency(t.total, moneda)}</span></div>
   `;
 }
 
@@ -1790,7 +1809,8 @@ async function submitInvoice(e, invId) {
   const t = DB.calcularTotales(invItems, 0, iva);
   const data = {
     ClienteID: [clienteId],
-    Items: JSON.stringify(invItems), Total: t.total,
+    Items: JSON.stringify(invItems), Total: t.total, IVA: t.iva,
+    Moneda: document.getElementById('inv-moneda').value,
     EsquemaPago: document.getElementById('inv-esquema').value,
     FechaVencimiento: document.getElementById('inv-vencimiento').value || null,
     NotasInternas: document.getElementById('inv-notas').value
@@ -1815,12 +1835,13 @@ async function verInvoice(id) {
   const pct = inv.Total ? Math.round((inv.TotalPagado||0)/inv.Total*100) : 0;
   const esquemaSteps = { '30-40-30':[{l:'1er pago',p:30},{l:'2do pago',p:40},{l:'3er pago',p:30}], '50-50':[{l:'1er pago',p:50},{l:'2do pago',p:50}], 'Pago completo':[{l:'Pago único',p:100}] };
   const steps = esquemaSteps[inv.EsquemaPago] || [{l:'Pago',p:100}];
+  const fmtInv = n => DB.fmtCurrency(n, inv.Moneda);
   let acumPagado = 0;
   const stepsHtml = steps.map(s=>{
     const monto = inv.Total * s.p/100;
     const pagado = acumPagado < (inv.TotalPagado||0);
     acumPagado += monto;
-    return `<div class="payment-step ${pagado?'paid':''}"><div class="payment-step-pct">${s.p}%</div><div class="payment-step-label">${s.l}</div><div class="num" style="font-size:var(--text-xs);margin-top:2px">${DB.formatearMoneda(monto)}</div></div>`;
+    return `<div class="payment-step ${pagado?'paid':''}"><div class="payment-step-pct">${s.p}%</div><div class="payment-step-label">${s.l}</div><div class="num" style="font-size:var(--text-xs);margin-top:2px">${fmtInv(monto)}</div></div>`;
   }).join('');
   showInvView('detail');
   document.getElementById('inv-detail-view').innerHTML = `
@@ -1840,15 +1861,15 @@ async function verInvoice(id) {
       <div style="margin-bottom:var(--space-6)"><div class="detail-label">Para</div><div style="font-weight:600;font-size:var(--text-md)">${getClienteNombre(inv.ClienteID)}</div></div>
       <div class="payment-progress no-print">
         <h3 style="font-family:var(--font-display);margin-bottom:var(--space-3)">Progreso de pago — ${inv.EsquemaPago}</h3>
-        <div style="margin-bottom:var(--space-3)"><div class="progress-bar" style="height:12px"><div class="progress-fill ${pct>=100?'fill-success':''}" style="width:${pct}%"></div></div><div style="display:flex;justify-content:space-between;margin-top:var(--space-2)"><span class="num" style="font-size:var(--text-xs);color:var(--text-muted)">Pagado: ${DB.formatearMoneda(inv.TotalPagado||0)} (${pct}%)</span><span class="num" style="font-size:var(--text-xs);color:var(--text-muted)">Pendiente: ${DB.formatearMoneda((inv.Total||0)-(inv.TotalPagado||0))}</span></div></div>
+        <div style="margin-bottom:var(--space-3)"><div class="progress-bar" style="height:12px"><div class="progress-fill ${pct>=100?'fill-success':''}" style="width:${pct}%"></div></div><div style="display:flex;justify-content:space-between;margin-top:var(--space-2)"><span class="num" style="font-size:var(--text-xs);color:var(--text-muted)">Pagado: ${fmtInv(inv.TotalPagado||0)} (${pct}%)</span><span class="num" style="font-size:var(--text-xs);color:var(--text-muted)">Pendiente: ${fmtInv((inv.Total||0)-(inv.TotalPagado||0))}</span></div></div>
         <div class="payment-track">${stepsHtml}</div>
       </div>
       <div class="table-wrap" style="margin-bottom:var(--space-6)"><table>
         <thead><tr><th>Descripción</th><th style="text-align:right">Cant.</th><th style="text-align:right">Precio unit.</th><th style="text-align:right">Subtotal</th></tr></thead>
-        <tbody>${items.map(it=>`<tr><td>${it.descripcion}</td><td class="num" style="text-align:right">${it.cantidad}</td><td class="num" style="text-align:right">${DB.formatearMoneda(it.precioUnitario)}</td><td class="num" style="text-align:right">${DB.formatearMoneda(it.cantidad*it.precioUnitario)}</td></tr>`).join('')}</tbody>
+        <tbody>${items.map(it=>`<tr><td>${it.descripcion}</td><td class="num" style="text-align:right">${it.cantidad}</td><td class="num" style="text-align:right">${fmtInv(it.precioUnitario)}</td><td class="num" style="text-align:right">${fmtInv(it.cantidad*it.precioUnitario)}</td></tr>`).join('')}</tbody>
       </table></div>
-      <div style="display:flex;justify-content:flex-end;margin-bottom:var(--space-6)"><div class="totals-box" style="min-width:280px"><div class="totals-row total-final"><span>Total</span><span>${DB.formatearMoneda(inv.Total)}</span></div></div></div>
-      ${pagos.length?`<div><div class="detail-label" style="margin-bottom:var(--space-3)">Historial de pagos</div><table><thead><tr><th>Fecha</th><th>Monto</th><th>Nota</th></tr></thead><tbody>${pagos.map(p=>`<tr><td class="num">${DB.formatearFecha(p.fecha)}</td><td class="num">${DB.formatearMoneda(p.monto)}</td><td>${p.nota||'—'}</td></tr>`).join('')}</tbody></table></div>`:''}
+      <div style="display:flex;justify-content:flex-end;margin-bottom:var(--space-6)"><div class="totals-box" style="min-width:280px"><div class="totals-row total-final"><span>Total</span><span>${fmtInv(inv.Total)}</span></div></div></div>
+      ${pagos.length?`<div><div class="detail-label" style="margin-bottom:var(--space-3)">Historial de pagos</div><table><thead><tr><th>Fecha</th><th>Monto</th><th>Nota</th></tr></thead><tbody>${pagos.map(p=>`<tr><td class="num">${DB.formatearFecha(p.fecha)}</td><td class="num">${fmtInv(p.monto)}</td><td>${p.nota||'—'}</td></tr>`).join('')}</tbody></table></div>`:''}
     </div>`;
 }
 
@@ -1878,16 +1899,17 @@ function printInvoicePDF(invId) {
   const nombre = AppConfig.NOMBRE || 'Mi Negocio';
   const email  = AppConfig.EMAIL  || 'equipo@codeal.ai';
   const statusColor = inv.Estado==='Pagada' ? '#22c87a' : inv.Estado==='Pendiente' ? '#f5a623' : '#9898b8';
+  const fmt = n => DB.fmtCurrency(n, inv.Moneda);
   const rows = items.map(it=>`
     <tr>
       <td style="padding:14px 18px;border-bottom:1px solid #f0f0f0;vertical-align:top">
         <div style="font-weight:600;margin-bottom:2px">${it.descripcion}</div>
       </td>
       <td style="padding:14px 18px;border-bottom:1px solid #f0f0f0;text-align:right">${it.cantidad}</td>
-      <td style="padding:14px 18px;border-bottom:1px solid #f0f0f0;text-align:right">$${parseFloat(it.precioUnitario||0).toLocaleString('en-US',{minimumFractionDigits:2})}</td>
-      <td style="padding:14px 18px;border-bottom:1px solid #f0f0f0;text-align:right">$${(parseFloat(it.cantidad||0)*parseFloat(it.precioUnitario||0)).toLocaleString('en-US',{minimumFractionDigits:2})}</td>
+      <td style="padding:14px 18px;border-bottom:1px solid #f0f0f0;text-align:right">${fmt(parseFloat(it.precioUnitario||0))}</td>
+      <td style="padding:14px 18px;border-bottom:1px solid #f0f0f0;text-align:right">${fmt(parseFloat(it.cantidad||0)*parseFloat(it.precioUnitario||0))}</td>
     </tr>`).join('');
-  const pagoRows = pagos.length ? pagos.map(p=>`<tr><td>${DB.formatearFecha(p.fecha)}</td><td>$${parseFloat(p.monto||0).toLocaleString('en-US',{minimumFractionDigits:2})}</td><td>${p.nota||'—'}</td></tr>`).join('') : '';
+  const pagoRows = pagos.length ? pagos.map(p=>`<tr><td>${DB.formatearFecha(p.fecha)}</td><td>${fmt(parseFloat(p.monto||0))}</td><td>${p.nota||'—'}</td></tr>`).join('') : '';
   const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Invoice ${inv.NumeroInv}</title>
   <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Segoe UI',Arial,sans-serif;color:#1a1a2e;background:#fff}
   .page{max-width:820px;margin:0 auto}
@@ -1934,9 +1956,9 @@ function printInvoicePDF(invId) {
       <tbody>${rows}</tbody>
     </table>
     <div class="totals"><div class="tbox">
-      <div class="tr"><span>Subtotal</span><span>$${(inv.Total||0).toLocaleString('en-US',{minimumFractionDigits:2})}</span></div>
-      <div class="tr"><span>Tax (0%)</span><span>$0.00</span></div>
-      <div class="tf"><span>TOTAL DUE</span><span>$${(inv.Total||0).toLocaleString('en-US',{minimumFractionDigits:2})} <span style="font-size:13px;font-weight:400;opacity:.7">MXN</span></span></div>
+      <div class="tr"><span>Subtotal</span><span>${fmt((inv.Subtotal||inv.Total||0))}</span></div>
+      ${inv.IVA?`<div class="tr"><span>IVA (16%)</span><span>${fmt(inv.IVA||0)}</span></div>`:''}
+      <div class="tf"><span>TOTAL DUE</span><span>${fmt(inv.Total||0)}</span></div>
     </div></div>
     ${inv.NotasInternas?`<div class="notes"><div class="nl">Notes</div><div class="nt">${inv.NotasInternas}</div></div>`:''}
     ${pagoRows?`<div class="notes" style="margin-top:24px"><div class="nl">Payment History</div><table style="margin-top:10px"><thead><tr style="background:#f9fafb"><th style="padding:8px;text-align:left;font-size:12px">Date</th><th style="padding:8px;text-align:left;font-size:12px">Amount</th><th style="padding:8px;text-align:left;font-size:12px">Note</th></tr></thead><tbody style="font-size:13px">${pagoRows}</tbody></table></div>`:''}
@@ -1997,13 +2019,15 @@ function generateCotPdfHtml(cot, clienteNombre, forPrint) {
   const scope  = notasObj.scope || '';
   const sColors = { Borrador:'#9898b8', Enviada:'#38B2E8', Aprobada:'#22c87a', Rechazada:'#f05b5b' };
   const statusColor = sColors[cot.Estado] || '#9898b8';
+  const moneda = cot.Moneda || 'MXN';
+  const fmt = n => DB.fmtCurrency(n, moneda);
 
   const rows = items.map(it => `
     <tr>
       <td style="padding:13px 18px;border-bottom:1px solid #f5f5f5"><span style="font-weight:600;color:#1a1a2e">${it.descripcion||'—'}</span></td>
       <td style="padding:13px 18px;border-bottom:1px solid #f5f5f5;text-align:right;color:#374151">${it.cantidad}</td>
-      <td style="padding:13px 18px;border-bottom:1px solid #f5f5f5;text-align:right;color:#374151">$${parseFloat(it.precioUnitario||0).toLocaleString('en-US',{minimumFractionDigits:2})}</td>
-      <td style="padding:13px 18px;border-bottom:1px solid #f5f5f5;text-align:right;font-weight:700;color:#111827">$${(parseFloat(it.cantidad||0)*parseFloat(it.precioUnitario||0)).toLocaleString('en-US',{minimumFractionDigits:2})}</td>
+      <td style="padding:13px 18px;border-bottom:1px solid #f5f5f5;text-align:right;color:#374151">${fmt(parseFloat(it.precioUnitario||0))}</td>
+      <td style="padding:13px 18px;border-bottom:1px solid #f5f5f5;text-align:right;font-weight:700;color:#111827">${fmt(parseFloat(it.cantidad||0)*parseFloat(it.precioUnitario||0))}</td>
     </tr>`).join('');
 
   const scopeBlock = scope ? `
@@ -2016,12 +2040,12 @@ function generateCotPdfHtml(cot, clienteNombre, forPrint) {
   const totalsBlock = `
     <div style="display:flex;justify-content:flex-end;margin:26px 0 34px">
       <div style="width:310px">
-        <div style="display:flex;justify-content:space-between;padding:8px 0;font-size:14px;color:#4b5563;border-bottom:1px solid #f3f4f6"><span>Subtotal</span><span>$${subtotal.toLocaleString('en-US',{minimumFractionDigits:2})}</span></div>
-        ${cot.DescuentoMonto?`<div style="display:flex;justify-content:space-between;padding:8px 0;font-size:14px;color:#ef4444;border-bottom:1px solid #f3f4f6"><span>Descuento (${cot.Descuento}%)</span><span>-$${(cot.DescuentoMonto||0).toLocaleString('en-US',{minimumFractionDigits:2})}</span></div>`:''}
-        ${cot.IVA?`<div style="display:flex;justify-content:space-between;padding:8px 0;font-size:14px;color:#4b5563;border-bottom:1px solid #f3f4f6"><span>IVA (16%)</span><span>$${(cot.IVA||0).toLocaleString('en-US',{minimumFractionDigits:2})}</span></div>`:''}
+        <div style="display:flex;justify-content:space-between;padding:8px 0;font-size:14px;color:#4b5563;border-bottom:1px solid #f3f4f6"><span>Subtotal</span><span>${fmt(subtotal)}</span></div>
+        ${cot.DescuentoMonto?`<div style="display:flex;justify-content:space-between;padding:8px 0;font-size:14px;color:#ef4444;border-bottom:1px solid #f3f4f6"><span>Descuento (${cot.Descuento}%)</span><span>-${fmt(cot.DescuentoMonto||0)}</span></div>`:''}
+        ${cot.IVA?`<div style="display:flex;justify-content:space-between;padding:8px 0;font-size:14px;color:#4b5563;border-bottom:1px solid #f3f4f6"><span>IVA (16%)</span><span>${fmt(cot.IVA||0)}</span></div>`:''}
         <div style="background:#111827;color:#fff;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;margin-top:8px;border-radius:6px">
           <span style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;opacity:.9">Total de inversión</span>
-          <span style="font-size:22px;font-weight:800">$${(cot.Total||0).toLocaleString('en-US',{minimumFractionDigits:2})} <span style="font-size:12px;font-weight:400;opacity:.6">MXN</span></span>
+          <span style="font-size:22px;font-weight:800">${fmt(cot.Total||0)}</span>
         </div>
       </div>
     </div>`;
